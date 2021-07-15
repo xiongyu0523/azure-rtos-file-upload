@@ -1,0 +1,5 @@
+﻿# Ignore output directories
+*dep
+settings/*
+*/settings/*
+*/Debug/*
