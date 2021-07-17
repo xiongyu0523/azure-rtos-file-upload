@@ -360,6 +360,7 @@
                     <state>$PROJ_DIR$\..\netxduo\addons\dns</state>
                     <state>$PROJ_DIR$\..\netxduo\addons\mqtt</state>
                     <state>$PROJ_DIR$\..\netxduo\addons\sntp</state>
+                    <state>$PROJ_DIR$\..\netxduo\addons\web</state>
                     <state>$PROJ_DIR$\..\netxduo\nx_secure\inc</state>
                     <state>$PROJ_DIR$\..\netxduo\nx_secure\ports</state>
                     <state>$PROJ_DIR$\..\common_hardware_code</state>

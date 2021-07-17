@@ -40,7 +40,7 @@ static void sample_thread_entry(ULONG parameter);
    via -D command line option or via project settings.  */
 
 #ifndef SAMPLE_PACKET_COUNT
-#define SAMPLE_PACKET_COUNT             (20)
+#define SAMPLE_PACKET_COUNT             (40)
 #endif /* SAMPLE_PACKET_COUNT  */
 
 #ifndef SAMPLE_PACKET_SIZE
@@ -55,7 +55,7 @@ static UCHAR sample_pool_stack[SAMPLE_POOL_SIZE];
 /* Define the prototypes for ThreadX.  */
 static NX_IP                            ip_0;
 static NX_PACKET_POOL                   pool_0;
-static NX_DNS     				    	dns_client;
+static NX_DNS                           dns_client;
 
 
 
@@ -65,12 +65,8 @@ static NX_DNS     				    	dns_client;
 #define SAMPLE_SNTP_SERVER_ADDRESS     IP_ADDRESS(118, 190, 21, 209)
 */
 
-#ifndef SAMPLE_SNTP_SERVER_NAME
-#define SAMPLE_SNTP_SERVER_NAME           "0.pool.ntp.org"    /* SNTP Server.  */
-#endif /* SAMPLE_SNTP_SERVER_NAME */
-
 #ifndef SAMPLE_SNTP_SYNC_MAX
-#define SAMPLE_SNTP_SYNC_MAX              3
+#define SAMPLE_SNTP_SYNC_MAX              30
 #endif /* SAMPLE_SNTP_SYNC_MAX */
 
 #ifndef SAMPLE_SNTP_UPDATE_MAX
@@ -81,9 +77,9 @@ static NX_DNS     				    	dns_client;
 #define SAMPLE_SNTP_UPDATE_INTERVAL       (NX_IP_PERIODIC_RATE / 2)
 #endif /* SAMPLE_SNTP_UPDATE_INTERVAL */
 
-/* Default time. GMT: Friday, Jan 1, 2021 12:00:00 AM. Epoch timestamp: 1609459200.  */
+/* Default time. GMT: Friday, Jan 1, 2022 12:00:00 AM. Epoch timestamp: 1640995200.  */
 #ifndef SAMPLE_SYSTEM_TIME 
-#define SAMPLE_SYSTEM_TIME                1609459200
+#define SAMPLE_SYSTEM_TIME              1640995200
 #endif /* SAMPLE_SYSTEM_TIME  */
 
 /* Seconds between Unix Epoch (1/1/1970) and NTP Epoch (1/1/1999) */
@@ -93,6 +89,15 @@ static NX_SNTP_CLIENT   sntp_client;
 
 /* System clock time for UTC.  */
 static ULONG            unix_time_base;
+
+static const CHAR *sntp_servers[] =
+{
+    "0.pool.ntp.org",
+    "1.pool.ntp.org",
+    "2.pool.ntp.org",
+    "3.pool.ntp.org",
+};
+static UINT sntp_server_index;
 
 static UINT dns_create();
 
@@ -119,6 +124,8 @@ void    tx_application_define(void *first_unused_memory)
 
 UINT    status;
 
+    NX_PARAMETER_NOT_USED(first_unused_memory);
+
     /* Initialize the NetX system.  */
     nx_system_initialize();
 
@@ -135,7 +142,7 @@ UINT    status;
         
     /* Create an IP instance.  */
      status = nx_ip_create(&ip_0, "NetX IP Instance 0", 0, 0,
-                           &pool_0, NULL, NULL, NULL, 0);
+                           &pool_0, NULL, NULL,(LONG) NULL, 0);
 
     /* Check for IP create errors.  */
     if (status)
@@ -196,6 +203,9 @@ UINT    status;
         /* Check status.  */
         if(status == NX_SUCCESS)
             break;
+
+        /* Switch SNTP server every time.  */
+        sntp_server_index = (sntp_server_index + 1) % (sizeof(sntp_servers) / sizeof(sntp_servers[0]));
     }
 
     /* Check status.  */
@@ -231,7 +241,7 @@ UCHAR   dns_address_2[4];
         return(status);
     }
 
-    /* Is the DNS client configured for the host application to create the pecket pool? */
+    /* Is the DNS client configured for the host application to create the packet pool? */
 #ifdef NX_DNS_CLIENT_USER_CREATE_PACKET_POOL   
 
     /* Yes, use the packet pool created above which has appropriate payload size
@@ -270,12 +280,11 @@ UINT    server_status;
 ULONG   sntp_server_address;
 UINT    i;
 
-
-    printf("SNTP Time Sync...\r\n");
-
 #ifndef SAMPLE_SNTP_SERVER_ADDRESS
+    printf("SNTP Time Sync...%s\r\n", sntp_servers[sntp_server_index]);
+
     /* Look up SNTP Server address. */
-    status = nx_dns_host_by_name_get(&dns_client, (UCHAR *)SAMPLE_SNTP_SERVER_NAME, &sntp_server_address, 5 * NX_IP_PERIODIC_RATE);
+    status = nx_dns_host_by_name_get(&dns_client, (UCHAR *)sntp_servers[sntp_server_index], &sntp_server_address, 5 * NX_IP_PERIODIC_RATE);
 
     /* Check status.  */
     if (status)
@@ -283,6 +292,7 @@ UINT    i;
         return(status);
     }
 #else /* !SAMPLE_SNTP_SERVER_ADDRESS */
+    printf("SNTP Time Sync...\r\n");
     sntp_server_address = SAMPLE_SNTP_SERVER_ADDRESS;
 #endif /* SAMPLE_SNTP_SERVER_ADDRESS */
 

@@ -1071,7 +1071,7 @@
                 </option>
                 <option>
                     <name>IarchiveOutput</name>
-                    <state>C:\Users\wangwen\Desktop\project\git_project\project-X-Ware\b-l4s5i-iot01a\iar\netxduo\Debug\Exe\netxduo.a</state>
+                    <state>C:\Users\yuxiong\Documents\GitHub\azure-rtos-file-upload\netxduo\Debug\Exe\netxduo.a</state>
                 </option>
             </data>
         </settings>
@@ -2437,6 +2437,18 @@
             </file>
             <file>
                 <name>$PROJ_DIR$\addons\sntp\nxd_sntp_client.h</name>
+            </file>
+        </group>
+        <group>
+            <name>web</name>
+            <file>
+                <name>$PROJ_DIR$\addons\web\nx_web_http_client.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\addons\web\nx_web_http_client.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\addons\web\nx_web_http_common.h</name>
             </file>
         </group>
     </group>

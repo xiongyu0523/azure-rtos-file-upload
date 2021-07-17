@@ -20,6 +20,10 @@
 #include "nx_azure_iot_ciphersuites.h"
 #include "sample_config.h"
 
+#ifndef DISABLE_FILE_UPLOAD_SAMPLE
+#include "nx_web_http_client.h"
+#endif /* DISABLE_FILE_UPLOAD_SAMPLE */
+
 /* Define Azure RTOS TLS info.  */
 static NX_SECURE_X509_CERT root_ca_cert;
 static UCHAR nx_azure_iot_tls_metadata_buffer[NX_AZURE_IOT_TLS_METADATA_BUFFER_SIZE];
@@ -48,6 +52,10 @@ static SAMPLE_CLIENT                                client;
 #ifdef ENABLE_DPS_SAMPLE
 #define prov_client client.prov_client
 #endif /* ENABLE_DPS_SAMPLE */
+
+#ifndef DISABLE_FILE_UPLOAD_SAMPLE
+    NX_WEB_HTTP_CLIENT                              https_client;
+#endif /* DISABLE_FILE_UPLOAD_SAMPLE */
  
 /* Using X509 certificate authenticate to connect to IoT Hub,
    set the device certificate as your device.  */
@@ -94,6 +102,24 @@ static TX_THREAD sample_device_twin_thread;
 static ULONG sample_device_twin_thread_stack[SAMPLE_STACK_SIZE / sizeof(ULONG)];
 #endif /* DISABLE_DEVICE_TWIN_SAMPLE */
 
+#ifndef DISABLE_FILE_UPLOAD_SAMPLE
+
+typedef struct 
+{
+    NX_IP           *ip_ptr;
+    NX_PACKET_POOL  *pool_ptr;
+    NX_DNS          *dns_ptr;
+} NXD_RESOURCE;
+
+#define NX_HTTP_TLS_PACKET_BUFFER_SIZE  (7 * 1024)
+static UCHAR tls_packet_buffer[NX_HTTP_TLS_PACKET_BUFFER_SIZE];
+
+static UCHAR nx_file_upload_tls_metadata_buffer[NX_AZURE_IOT_TLS_METADATA_BUFFER_SIZE];
+
+static TX_THREAD sample_file_upload_thread;
+static ULONG sample_file_upload_thread_stack[SAMPLE_STACK_SIZE / sizeof(ULONG)];
+#endif /* DISABLE_FILE_UPLOAD_SAMPLE */
+
 void sample_entry(NX_IP *ip_ptr, NX_PACKET_POOL *pool_ptr, NX_DNS *dns_ptr, UINT (*unix_time_callback)(ULONG *unix_time));
 #ifdef ENABLE_DPS_SAMPLE
 static UINT sample_dps_entry(UCHAR **iothub_hostname, UINT *iothub_hostname_length,
@@ -114,6 +140,20 @@ static void sample_direct_method_thread_entry(ULONG parameter);
 #ifndef DISABLE_DEVICE_TWIN_SAMPLE
 static void sample_device_twin_thread_entry(ULONG parameter);
 #endif /* DISABLE_DEVICE_TWIN_SAMPLE */
+
+#ifndef DISABLE_FILE_UPLOAD_SAMPLE
+static void sample_file_upload_thread_entry(ULONG parameter);
+#endif /* DISABLE_FILE_UPLOAD_SAMPLE */
+
+void print_ip(LONG ip)
+{
+    unsigned char bytes[4];
+    bytes[0] = ip & 0xFF;
+    bytes[1] = (ip >> 8) & 0xFF;
+    bytes[2] = (ip >> 16) & 0xFF;
+    bytes[3] = (ip >> 24) & 0xFF;   
+    printf("Resolved Server IP %d.%d.%d.%d\r\n", bytes[3], bytes[2], bytes[1], bytes[0]);        
+}
 
 static VOID printf_packet(NX_PACKET *packet_ptr)
 {
@@ -345,6 +385,25 @@ UINT loop = NX_TRUE;
         printf("Failed to create device twin sample thread!: error code = 0x%08x\r\n", status);
     }
 #endif /* DISABLE_DEVICE_TWIN_SAMPLE */
+    
+#ifndef DISABLE_FILE_UPLOAD_SAMPLE
+
+    NXD_RESOURCE res;
+
+    res.ip_ptr = ip_ptr;
+    res.pool_ptr = pool_ptr;
+    res.dns_ptr = dns_ptr;
+    
+    /* Create Device twin sample thread.  */
+    if ((status = tx_thread_create(&sample_file_upload_thread, "Sample File Upload Thread",
+                                   sample_file_upload_thread_entry, (ULONG)&res,
+                                   (UCHAR *)sample_file_upload_thread_stack, SAMPLE_STACK_SIZE,
+                                   SAMPLE_THREAD_PRIORITY, SAMPLE_THREAD_PRIORITY,
+                                   1, TX_AUTO_START)))
+    {
+        printf("Failed to create file upload sample thread!: error code = 0x%08x\r\n", status);
+    }
+#endif /* DISABLE_FILE_UPLOAD_SAMPLE */
 
     /* Simply loop in sample.  */
     while (loop)
@@ -637,3 +696,211 @@ ULONG reported_property_version;
     }
 }
 #endif /* DISABLE_DEVICE_TWIN_SAMPLE */
+
+#ifndef DISABLE_FILE_UPLOAD_SAMPLE
+
+/* Callback to setup TLS parameters for secure HTTPS. */
+UINT tls_setup_callback(NX_WEB_HTTP_CLIENT *client_ptr, NX_SECURE_TLS_SESSION *tls_session)
+{
+UINT status;
+
+    NX_PARAMETER_NOT_USED(client_ptr);
+
+    /* Initialize and create TLS session. */
+    status = _nx_secure_tls_session_create_ext(tls_session, 
+                                               _nx_azure_iot_tls_supported_crypto, 
+                                               _nx_azure_iot_tls_supported_crypto_size,
+                                               _nx_azure_iot_tls_ciphersuite_map,
+                                               _nx_azure_iot_tls_ciphersuite_map_size,
+                                               nx_file_upload_tls_metadata_buffer,
+                                               sizeof(nx_file_upload_tls_metadata_buffer));
+    
+    /* Check status.  */
+    if (status != NX_SUCCESS)
+    {
+        return(status);
+    }
+
+
+    status = nx_secure_tls_trusted_certificate_add(tls_session, &root_ca_cert);
+    if (status)
+    {
+        printf("Failed to add trusted CA certificate to session status: %d\r\n", status);
+        return(status);
+    }
+
+#if (USE_DEVICE_CERTIFICATE == 1)
+    status = nx_secure_tls_local_certificate_add(tls_session, &device_certificate);
+    if (status)
+    {
+        printf("Failed to add device certificate to session status: %d\r\n", status);
+        return(status);
+    }
+#endif
+
+    status = nx_secure_tls_session_packet_buffer_set(tls_session, tls_packet_buffer, sizeof(tls_packet_buffer));
+    if (status != NX_SUCCESS)
+    {
+        printf("Failed to set the session packet buffer: status: %d\r\n", status);
+        return(status);
+    }
+
+#if 0
+    /* Setup the callback invoked when TLS has a certificate it wants to verify so we can
+       do additional checks not done automatically by TLS.  */
+    status = nx_secure_tls_session_certificate_callback_set(tls_session,
+                                                            nx_azure_iot_certificate_verify);
+    if (status)
+    {
+        LogError(LogLiteralArgs("Failed to set the session certificate callback: status: %d"), status);
+        return(status);
+    }
+
+#ifndef NX_AZURE_IOT_DISABLE_CERTIFICATE_DATE
+    /* Setup the callback function used by checking certificate valid date.  */
+    nx_secure_tls_session_time_function_set(tls_session, nx_azure_iot_tls_time_function);
+#endif /* NX_AZURE_IOT_DISABLE_CERTIFICATE_DATE */
+
+#endif
+
+    return(NX_SUCCESS);
+}
+
+VOID http_response_callback(NX_WEB_HTTP_CLIENT *client_ptr, CHAR *field_name, UINT field_name_length,
+                            CHAR *field_value, UINT field_value_length)
+{
+CHAR name[100];
+CHAR value[100];
+
+    memset(name, 0, sizeof(name));
+    memset(value, 0, sizeof(value));
+
+    strncpy(name, field_name, field_name_length);
+    strncpy(value, field_value, field_value_length);
+
+    printf("Field name: %s\r\n", name);
+    printf("Value: %s\r\n", value);
+}
+
+void sample_file_upload_thread_entry(ULONG parameter)
+{
+UINT            status;
+UINT            get_status;
+NX_PACKET      *receive_packet;
+UCHAR           receive_buffer[500];
+ULONG           bytes;
+NXD_ADDRESS     server_ip_address;
+
+    NXD_RESOURCE *pres = (NXD_RESOURCE *)parameter;
+
+    /* Create an HTTP client instance.  */
+    if (status = nx_web_http_client_create(&https_client, "HTTPS Client", pres->ip_ptr, pres->pool_ptr, 8192))
+    {
+        printf("Failed to create http client!: error code = 0x%08x\r\n", status);
+    }
+
+    /* Resolve the host name.  */
+    if (status = nxd_dns_host_by_name_get(pres->dns_ptr,
+                                          sample_iothub_hostname,
+                                          &server_ip_address, NX_AZURE_IOT_HUB_CLIENT_DNS_TIMEOUT,
+                                          NX_IP_VERSION_V4))
+    {
+        printf("Failed to solve iot hub host name!: error code = 0x%08x\r\n", status);
+    }
+
+    /* Set the header callback routine. */
+    nx_web_http_client_response_header_callback_set(&https_client, http_response_callback);
+            
+    status = nx_web_http_client_secure_connect(&https_client, &server_ip_address, NX_WEB_HTTPS_SERVER_PORT,
+                                                tls_setup_callback, NX_WAIT_FOREVER);
+    if (status != NX_SUCCESS)
+    {
+        printf("Failed on HTTPS Connection setup: 0x%x\n", status);
+        return;
+    }
+
+    /* Initialize HTTP request. */
+    status = nx_web_http_client_request_initialize_extended(&https_client,
+                                                            NX_WEB_HTTP_METHOD_POST,
+                                                            "/devices/x509-rsa2048-device/files?api-version=2020-03-13",
+                                                            sizeof("/devices/x509-rsa2048-device/files?api-version=2020-03-13")-1, 
+                                                            sample_iothub_hostname, /* Used by PUT and POST */
+                                                            strlen(sample_iothub_hostname),
+                                                            sizeof("{\"blobName\": \"567.png\"}")-1,
+                                                            NX_FALSE,
+                                                            NX_NULL, 0, NULL, 0, NX_WAIT_FOREVER);
+    if (status != NX_SUCCESS)
+    {
+        printf("Error in HTTPS request intialization: 0x%x\n", status);
+        return;
+    }
+
+    /* Content-Type: application/json is required custom header for Azure IoT REST API */
+    status = nx_web_http_client_request_header_add(&https_client, 
+                                                   "Content-Type", sizeof("Content-Type") - 1, 
+                                                   "application/json", sizeof("application/json") - 1, 
+                                                   NX_NO_WAIT);
+    if (status != NX_SUCCESS)
+    {
+        printf("Failed to add custom request header: 0x%x\n", status);
+        return;
+    }
+
+    /* Send the HTTP request we just built. */
+    status = nx_web_http_client_request_send(&https_client, NX_WAIT_FOREVER);
+    if (status != NX_SUCCESS)
+    {
+        printf("Error in HTTPS request send: 0x%x\n", status);
+        return;
+    }
+
+    NX_PACKET *packet_ptr = NULL;
+
+    status = nx_web_http_client_request_packet_allocate(&https_client, &packet_ptr, NX_WAIT_FOREVER);
+    if (status != NX_SUCCESS)
+    {
+        printf("Error in HTTPS packet allocate: 0x%x\n", status);
+        return;
+    }
+
+    nx_packet_data_append(packet_ptr, "{\"blobName\": \"567.png\"}", sizeof("{\"blobName\": \"567.png\"}")-1, pres->pool_ptr, NX_WAIT_FOREVER);
+
+    status = nx_web_http_client_put_packet(&https_client, packet_ptr, NX_WAIT_FOREVER);
+    if (status != NX_SUCCESS)
+    {
+        printf("Error in HTTPS put packet: 0x%x\n", status);
+        return;
+    }
+
+
+    get_status = NX_SUCCESS;
+    while(get_status != NX_WEB_HTTP_GET_DONE)
+    {
+        get_status = nx_web_http_client_response_body_get(&https_client, &receive_packet, NX_WAIT_FOREVER);
+
+        /* Check for error.  */
+        if (get_status != NX_SUCCESS && get_status != NX_WEB_HTTP_GET_DONE)
+        {
+            printf("HTTPS get packet failed, error: 0x%x\n", get_status);
+            return;
+        }
+        else
+        {
+
+            status = nx_packet_data_extract_offset(receive_packet, 0, &receive_buffer[0], 500, &bytes);
+            if(status)
+            {
+                printf("Error in extracting response body data: 0x%x\n", status);
+            }
+            printf("Received %d bytes\r\n", bytes);
+            receive_buffer[bytes] = '\0';
+            printf("%s", receive_buffer);
+
+            nx_packet_release(receive_packet);
+        }
+    }
+
+    /* Clear out the HTTP client when we are done. */
+    status = nx_web_http_client_delete(&https_client);
+}
+#endif /* DISABLE_FILE_UPLOAD_SAMPLE */

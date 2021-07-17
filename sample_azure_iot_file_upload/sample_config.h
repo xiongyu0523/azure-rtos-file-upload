@@ -21,16 +21,16 @@ extern   "C" {
    simply defining USE_DEVICE_CERTIFICATE and setting your device certificate in sample_device_identity.c
    to connect to IoT Hub with x509 certificate. Set up X.509 security in your Azure IoT Hub,
    refer to https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-security-x509-get-started  */
-/* #define USE_DEVICE_CERTIFICATE                      1  */
+#define USE_DEVICE_CERTIFICATE                      1
 
 /*
 TODO`s: Configure core settings of application for your IoTHub.
 */
 
 /* Defined, DPS is enabled.  */
-/*
+
 #define ENABLE_DPS_SAMPLE
-*/
+
 
 /* Defined, telemetry is disabled.  */
 /*
@@ -50,6 +50,11 @@ TODO`s: Configure core settings of application for your IoTHub.
 /* Defined, Device twin is disabled.  */
 /*
 #define DISABLE_DEVICE_TWIN_SAMPLE
+*/
+  
+/* Defined, File upload is disabled.  */
+/*
+#define DISABLE_FILE_UPLOAD_SAMPLE
 */
 
 #ifndef ENABLE_DPS_SAMPLE
@@ -71,7 +76,7 @@ TODO`s: Configure core settings of application for your IoTHub.
 
 /* Required when DPS is used.  */
 #ifndef ENDPOINT
-#define ENDPOINT                                    ""
+#define ENDPOINT                                    "global.azure-devices-provisioning.net"
 #endif /* ENDPOINT */
 
 #ifndef ID_SCOPE
