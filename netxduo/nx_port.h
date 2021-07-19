@@ -84,6 +84,7 @@
 #define NX_SNTP_CLIENT_MESSAGE_CHECK_DISABLE
      
 /* Azure IoT Security Module */
+#define NX_AZURE_DISABLE_IOT_SECURITY_MODULE
 #define NX_ENABLE_IP_PACKET_FILTER
 
 extern int hardware_rand(void);

@@ -33,6 +33,9 @@ extern   "C" {
 #include "nx_cloud.h"
 #include "nxd_dns.h"
 #include "nxd_mqtt_client.h"
+#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#include "nx_web_http_client.h"
+#endif
 
 /**< Value denoting a message is of "None" type */
 #define NX_AZURE_IOT_HUB_NONE                                       0x00000000
@@ -187,6 +190,9 @@ UINT nx_azure_iot_hub_client_initialize(NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr,
                                         const NX_CRYPTO_METHOD **crypto_array, UINT crypto_array_size,
                                         const NX_CRYPTO_CIPHERSUITE **cipher_map, UINT cipher_map_size,
                                         UCHAR *metadata_memory, UINT memory_size,
+#ifdef NX_AZURE_IOT_FILE_UPLOAD
+                                        UCHAR *https_metadata_memory, UINT https_memory_size,
+#endif
                                         NX_SECURE_X509_CERT *trusted_certificate);
 
 /**
@@ -677,6 +683,16 @@ UINT nx_azure_iot_hub_client_direct_method_message_response(NX_AZURE_IOT_HUB_CLI
                                                             UINT status_code, VOID *context_ptr,
                                                             USHORT context_length, const UCHAR *payload,
                                                             UINT payload_length, UINT wait_option);
+
+#ifdef NX_AZURE_IOT_FILE_UPLOAD
+UINT nx_azure_iot_hub_file_upload_retrieve_sas_uri(NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr,
+                                                   UCHAR *blob, UINT blob_length, 
+                                                   UCHAR *hostname, UINT hostname_length, 
+                                                   UCHAR *container, UINT container_length, 
+                                                   UCHAR *sas, UINT sas_length, 
+                                                   UINT wait_option);
+#endif /* NX_AZURE_IOT_FILE_UPLOAD */
+
 #ifdef __cplusplus
 }
 #endif

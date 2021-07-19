@@ -182,7 +182,7 @@ static az_log_classification const classifications[] = {AZ_LOG_IOT_AZURERTOS,
     az_log_set_message_callback(nx_azure_iot_log_listener);
 }
 
-NX_AZURE_IOT_RESOURCE *nx_azure_iot_resource_search(NXD_MQTT_CLIENT *client_ptr)
+NX_AZURE_IOT_RESOURCE *nx_azure_iot_resource_search(VOID *client_ptr)
 {
 NX_AZURE_IOT_RESOURCE *resource_ptr;
 
@@ -197,7 +197,12 @@ NX_AZURE_IOT_RESOURCE *resource_ptr;
          resource_ptr; resource_ptr = resource_ptr -> resource_next)
     {
 
-        if (&(resource_ptr -> resource_mqtt) == client_ptr)
+        if (
+            (&(resource_ptr -> resource_mqtt) == client_ptr)
+#ifdef NX_AZURE_IOT_FILE_UPLOAD
+            || (&(resource_ptr -> resource_https) == client_ptr)
+#endif
+           )
         {
             return(resource_ptr);
         }
@@ -698,6 +703,78 @@ NX_AZURE_IOT_RESOURCE *resource_ptr;
 
     return(NX_AZURE_IOT_SUCCESS);
 }
+
+#ifdef NX_AZURE_IOT_FILE_UPLOAD
+UINT nx_azure_iot_https_tls_setup(NX_WEB_HTTP_CLIENT *client_ptr, NX_SECURE_TLS_SESSION *tls_session)
+{
+UINT status;
+NX_AZURE_IOT_RESOURCE *resource_ptr;
+
+    resource_ptr = nx_azure_iot_resource_search(client_ptr);
+    if (resource_ptr == NX_NULL)
+    {
+        LogError(LogLiteralArgs("Failed to find associated resource"));
+        return(NX_AZURE_IOT_INVALID_PARAMETER);
+    }
+
+    /* Create TLS session.  */
+    status = _nx_secure_tls_session_create_ext(tls_session,
+                                               resource_ptr -> resource_crypto_array,
+                                               resource_ptr -> resource_crypto_array_size,
+                                               resource_ptr -> resource_cipher_map,
+                                               resource_ptr -> resource_cipher_map_size,
+                                               resource_ptr -> resource_https_metadata_ptr,
+                                               resource_ptr -> resource_https_metadata_size);
+    if (status)
+    {
+        LogError(LogLiteralArgs("Failed to create TLS session status: %d"), status);
+        return(status);
+    }
+
+    status = nx_secure_tls_trusted_certificate_add(tls_session, resource_ptr -> resource_trusted_certificate);
+    if (status)
+    {
+        LogError(LogLiteralArgs("Failed to add trusted CA certificate to session status: %d"), status);
+        return(status);
+    }
+
+    if (resource_ptr -> resource_device_certificate)
+    {
+        status = nx_secure_tls_local_certificate_add(tls_session, resource_ptr -> resource_device_certificate);
+        if (status)
+        {
+            LogError(LogLiteralArgs("Failed to add device certificate to session status: %d"), status);
+            return(status);
+        }
+    }
+
+    status = nx_secure_tls_session_packet_buffer_set(tls_session,
+                                                     resource_ptr -> resource_http_tls_packet_buffer,
+                                                     sizeof(resource_ptr -> resource_http_tls_packet_buffer));
+    if (status)
+    {
+        LogError(LogLiteralArgs("Failed to set the session packet buffer: status: %d"), status);
+        return(status);
+    }
+#if 0 // TODO, when below is enabled, i get NX_CPYPTO_INVALID_BUFFER_SIZE error
+    /* Setup the callback invoked when TLS has a certificate it wants to verify so we can
+       do additional checks not done automatically by TLS.  */
+    status = nx_secure_tls_session_certificate_callback_set(tls_session,
+                                                            nx_azure_iot_certificate_verify);
+    if (status)
+    {
+        LogError(LogLiteralArgs("Failed to set the session certificate callback: status: %d"), status);
+        return(status);
+    }
+
+#ifndef NX_AZURE_IOT_DISABLE_CERTIFICATE_DATE
+    /* Setup the callback function used by checking certificate valid date.  */
+    nx_secure_tls_session_time_function_set(tls_session, nx_azure_iot_tls_time_function);
+#endif /* NX_AZURE_IOT_DISABLE_CERTIFICATE_DATE */
+#endif
+    return(NX_AZURE_IOT_SUCCESS);
+}
+#endif
 
 UINT nx_azure_iot_unix_time_get(NX_AZURE_IOT *nx_azure_iot_ptr, ULONG *unix_time)
 {

@@ -355,6 +355,7 @@
                     <state>$PROJ_DIR$\..\netxduo\addons\cloud</state>
                     <state>$PROJ_DIR$\..\netxduo\addons\dns</state>
                     <state>$PROJ_DIR$\..\netxduo\addons\mqtt</state>
+                    <state>$PROJ_DIR$\..\netxduo\addons\web</state>
                     <state>$PROJ_DIR$\..\netxduo\nx_secure\inc</state>
                     <state>$PROJ_DIR$\..\netxduo\nx_secure\ports</state>
                     <state>$PROJ_DIR$\..\netxduo\crypto_libraries\inc</state>

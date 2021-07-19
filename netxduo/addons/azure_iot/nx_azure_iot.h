@@ -30,6 +30,13 @@ extern   "C" {
 #include "nxd_dns.h"
 #include "nxd_mqtt_client.h"
 
+/* Defined, file upload feature is eanble. By default, it is disabled. */
+#define NX_AZURE_IOT_FILE_UPLOAD
+
+#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#include "nx_web_http_client.h"
+#endif
+
 #ifndef NXD_MQTT_CLOUD_ENABLE
 #error "NXD_MQTT_CLOUD_ENABLE must be defined"
 #endif /* NXD_MQTT_CLOUD_ENABLE */
@@ -155,6 +162,9 @@ typedef struct NX_AZURE_IOT_RESOURCE_STRUCT
     UINT                                   resource_type;
     VOID                                  *resource_data_ptr;
     NXD_MQTT_CLIENT                        resource_mqtt;
+#ifdef NX_AZURE_IOT_FILE_UPLOAD
+    NX_WEB_HTTP_CLIENT                     resource_https;
+#endif
     UCHAR                                 *resource_mqtt_client_id;
     UINT                                   resource_mqtt_client_id_length;
     UCHAR                                 *resource_mqtt_user_name;
@@ -164,12 +174,19 @@ typedef struct NX_AZURE_IOT_RESOURCE_STRUCT
     VOID                                  *resource_mqtt_buffer_context;
     UINT                                   resource_mqtt_buffer_size;
     UCHAR                                  resource_tls_packet_buffer[NX_AZURE_IOT_TLS_PACKET_BUFFER_SIZE];
+#ifdef NX_AZURE_IOT_FILE_UPLOAD
+    UCHAR                                  resource_http_tls_packet_buffer[NX_AZURE_IOT_TLS_PACKET_BUFFER_SIZE];
+#endif /* NX_AZURE_IOT_FILE_UPLOAD */
     const NX_CRYPTO_METHOD               **resource_crypto_array;
     UINT                                   resource_crypto_array_size;
     const NX_CRYPTO_CIPHERSUITE          **resource_cipher_map;
     UINT                                   resource_cipher_map_size;
     UCHAR                                 *resource_metadata_ptr;
     UINT                                   resource_metadata_size;
+#ifdef NX_AZURE_IOT_FILE_UPLOAD
+    UCHAR                                 *resource_https_metadata_ptr;
+    UINT                                   resource_https_metadata_size;
+#endif /* NX_AZURE_IOT_FILE_UPLOAD */
     NX_SECURE_X509_CERT                   *resource_trusted_certificate;
     NX_SECURE_X509_CERT                   *resource_device_certificate;
     const UCHAR                           *resource_hostname;
@@ -282,7 +299,7 @@ UINT nx_azure_iot_buffer_allocate(NX_AZURE_IOT *nx_azure_iot_ptr, UCHAR **buffer
 UINT nx_azure_iot_buffer_free(VOID *buffer_context);
 UINT nx_azure_iot_resource_add(NX_AZURE_IOT *nx_azure_iot_ptr, NX_AZURE_IOT_RESOURCE *resource);
 UINT nx_azure_iot_resource_remove(NX_AZURE_IOT *nx_azure_iot_ptr, NX_AZURE_IOT_RESOURCE *resource);
-NX_AZURE_IOT_RESOURCE *nx_azure_iot_resource_search(NXD_MQTT_CLIENT *client_ptr);
+NX_AZURE_IOT_RESOURCE *nx_azure_iot_resource_search(VOID *client_ptr);
 UINT nx_azure_iot_publish_mqtt_packet(NXD_MQTT_CLIENT *client_ptr, NX_PACKET *packet_ptr,
                                       UINT topic_len, UCHAR *packet_id, UINT qos, UINT wait_option);
 UINT nx_azure_iot_publish_packet_get(NX_AZURE_IOT *nx_azure_iot_ptr, NXD_MQTT_CLIENT *client_ptr,
@@ -292,6 +309,10 @@ VOID nx_azure_iot_mqtt_packet_adjust(NX_PACKET *packet_ptr);
 UINT nx_azure_iot_mqtt_tls_setup(NXD_MQTT_CLIENT *client_ptr, NX_SECURE_TLS_SESSION *tls_session,
                                  NX_SECURE_X509_CERT *certificate,
                                  NX_SECURE_X509_CERT *trusted_certificate);
+#ifdef NX_AZURE_IOT_FILE_UPLOAD
+UINT nx_azure_iot_https_tls_setup(NX_WEB_HTTP_CLIENT *client_ptr, NX_SECURE_TLS_SESSION *tls_session);
+#endif
+                                
 UINT nx_azure_iot_base64_hmac_sha256_calculate(NX_AZURE_IOT_RESOURCE *resource_ptr,
                                                const UCHAR *key_ptr, UINT key_size,
                                                const UCHAR *message_ptr, UINT message_size,
