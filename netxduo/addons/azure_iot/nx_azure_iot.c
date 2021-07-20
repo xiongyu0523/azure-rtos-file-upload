@@ -568,7 +568,12 @@ UINT status = NX_AZURE_IOT_SUCCESS;
          resource_ptr; resource_ptr = resource_ptr -> resource_next)
     {
 
-        if (&(resource_ptr -> resource_mqtt.nxd_mqtt_tls_session) == session)
+        if (
+            (&(resource_ptr -> resource_mqtt.nxd_mqtt_tls_session) == session)
+#ifdef NX_AZURE_IOT_FILE_UPLOAD
+            || (&(resource_ptr -> resource_https.nx_web_http_client_tls_session) == session)
+#endif
+           )
         {
             break;
         }
@@ -756,7 +761,7 @@ NX_AZURE_IOT_RESOURCE *resource_ptr;
         LogError(LogLiteralArgs("Failed to set the session packet buffer: status: %d"), status);
         return(status);
     }
-#if 0 // TODO, when below is enabled, i get NX_CPYPTO_INVALID_BUFFER_SIZE error
+
     /* Setup the callback invoked when TLS has a certificate it wants to verify so we can
        do additional checks not done automatically by TLS.  */
     status = nx_secure_tls_session_certificate_callback_set(tls_session,
@@ -771,7 +776,7 @@ NX_AZURE_IOT_RESOURCE *resource_ptr;
     /* Setup the callback function used by checking certificate valid date.  */
     nx_secure_tls_session_time_function_set(tls_session, nx_azure_iot_tls_time_function);
 #endif /* NX_AZURE_IOT_DISABLE_CERTIFICATE_DATE */
-#endif
+
     return(NX_AZURE_IOT_SUCCESS);
 }
 #endif
