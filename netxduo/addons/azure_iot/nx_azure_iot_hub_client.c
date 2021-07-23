@@ -2712,77 +2712,101 @@ UINT status = NX_AZURE_IOT_SUCCESS;
 #ifdef NX_AZURE_IOT_FILE_UPLOAD
 
 static const uint8_t null_terminator = '\0';
-static const az_span file_upload_uri_prefix = AZ_SPAN_LITERAL_FROM_STR("/devices/");
-static const az_span file_upload_uri_suffix = AZ_SPAN_LITERAL_FROM_STR("/files?api-version=2020-03-13");
+static const uint8_t hub_client_forward_slash = '/';
+static const az_span devices_str_span = AZ_SPAN_LITERAL_FROM_STR("/devices");
+static const az_span files_str_span = AZ_SPAN_LITERAL_FROM_STR("/files");
+static const az_span notifications_str_span = AZ_SPAN_LITERAL_FROM_STR("/notifications");
+static const az_span api_version_span = AZ_SPAN_LITERAL_FROM_STR("?api-version=2020-03-13");
 
-static const az_span file_upload_body_prefix = AZ_SPAN_LITERAL_FROM_STR("{\"blobName\":\"");
-static const az_span file_upload_body_suffix = AZ_SPAN_LITERAL_FROM_STR("\"}");
-
-static az_result nx_az_iot_hub_client_get_file_upload_request_uri(az_iot_hub_client const* client,
-                                                             UCHAR *request_uri_buf,
-                                                             UINT request_uri_size,
-                                                             UINT *out_request_uri_length)
+static az_result az_iot_hub_client_get_file_upload_request_uri(az_iot_hub_client const* client,
+                                                               char *request_uri_buf,
+                                                               size_t request_uri_size,
+                                                               size_t *out_request_uri_len)
 {
-    az_span request_uri_span = az_span_create(request_uri_buf, (int32_t)request_uri_size);
+    az_span request_uri_span = az_span_create((uint8_t *)request_uri_buf, (int32_t)request_uri_size);
 
-    int32_t required_length = az_span_size(file_upload_uri_prefix) 
-        + az_span_size(client->_internal.device_id) + az_span_size(file_upload_uri_suffix);
+    int32_t required_len = az_span_size(devices_str_span) 
+        + (int32_t)sizeof(hub_client_forward_slash) + az_span_size(client->_internal.device_id) 
+        + az_span_size(files_str_span) + az_span_size(api_version_span);
 
-    if (request_uri_size < required_length + (int32_t)sizeof(null_terminator)) {
+    if (request_uri_size < required_len + (int32_t)sizeof(null_terminator)) {
         return AZ_ERROR_NOT_ENOUGH_SPACE;
     }
 
-    az_span remainder = az_span_copy(request_uri_span, file_upload_uri_prefix);
+    az_span remainder = az_span_copy(request_uri_span, devices_str_span);
+    remainder = az_span_copy_u8(remainder, hub_client_forward_slash);
     remainder = az_span_copy(remainder, client->_internal.device_id);
-    remainder = az_span_copy(remainder, file_upload_uri_suffix);
+    remainder = az_span_copy(remainder, files_str_span);
+    remainder = az_span_copy(remainder, api_version_span);
     remainder = az_span_copy_u8(remainder, null_terminator);
 
-    if (out_request_uri_length)
+    if (out_request_uri_len)
     {
-        *out_request_uri_length = required_length;
+        *out_request_uri_len = required_len;
     }
 
     return AZ_OK;
 }
 
-static az_result nx_az_iot_hub_client_get_file_upload_request_body(UCHAR *blob_name,
-                                                              UINT blob_name_length,
-                                                              UCHAR *request_body_buf,
-                                                              UINT request_body_size,
-                                                              UINT *out_request_body_length)
+static UINT nx_az_iot_hub_client_construct_file_upload_request_body(UCHAR *target_blob,
+                                                                    UINT target_blob_len,
+                                                                    UCHAR *request_body_buf,
+                                                                    UINT request_body_size,
+                                                                    UINT *out_request_body_len)
 {
-    az_span blob_span = az_span_create(blob_name, (int32_t)blob_name_length);
-    az_span request_body_span = az_span_create(request_body_buf, (int32_t)request_body_size);
+NX_AZURE_IOT_JSON_WRITER json_writer;
+UINT status;
+UINT bytes_used;
 
-    int32_t required_length = az_span_size(file_upload_body_prefix)
-        + blob_name_length + az_span_size(file_upload_body_suffix);
-
-    if (request_body_size < required_length + (int32_t)sizeof(null_terminator)) {
-        return AZ_ERROR_NOT_ENOUGH_SPACE;
-    }
-
-    az_span remainder = az_span_copy(request_body_span, file_upload_body_prefix);
-    remainder = az_span_copy(remainder, blob_span);
-    remainder = az_span_copy(remainder, file_upload_body_suffix);
-    remainder = az_span_copy_u8(remainder, null_terminator);
-
-    if (out_request_body_length)
+    status = nx_azure_iot_json_writer_with_buffer_init(&json_writer, request_body_buf, request_body_size);
+    if (status != NX_SUCCESS) 
     {
-        *out_request_body_length = required_length;
+        return (status);
     }
 
-    return AZ_OK;
+    status = nx_azure_iot_json_writer_append_begin_object(&json_writer);
+    if (status != NX_SUCCESS) 
+    {
+        return (status);
+    }
+
+    status = nx_azure_iot_json_writer_append_property_with_string_value(&json_writer, 
+        "blobName", sizeof("blobName") - 1, target_blob, target_blob_len);
+    if (status != NX_SUCCESS) 
+    {
+        return (status);
+    }
+
+    status = nx_azure_iot_json_writer_append_end_object(&json_writer);
+    if (status != NX_SUCCESS) 
+    {
+        return (status);
+    }
+
+    bytes_used = nx_azure_iot_json_writer_get_bytes_used(&json_writer);
+    if (bytes_used > request_body_size) 
+    {
+        return NX_AZURE_IOT_INSUFFICIENT_BUFFER_SPACE;
+    } 
+    else
+    {
+        *out_request_body_len = bytes_used;
+        return NX_SUCCESS;
+    }
 }
 
 UINT nx_azure_iot_hub_file_upload_retrieve_sas_uri(NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr,
-                                                   UCHAR *blob, UINT blob_length,
-                                                   UCHAR *hostname, UINT hostname_length, 
-                                                   UCHAR *container, UINT container_length, 
-                                                   UCHAR *sas, UINT sas_length, 
+                                                   UCHAR *target_blob, UINT target_blob_len,
+                                                   UCHAR *correlation_id, UINT correlation_id_max_len,
+                                                   UCHAR *host_name, UINT host_name_max_len,
+                                                   UCHAR *container, UINT container_max_len,
+                                                   UCHAR *blob_name, UINT blob_name_max_len,
+                                                   UCHAR *sas_token, UINT sas_token_max_len,
                                                    UINT wait_option)
 {
-UINT            status;
-NXD_ADDRESS     server_address;
+UINT status;
+az_result core_result;
+NXD_ADDRESS server_address;
 
 NX_AZURE_IOT_RESOURCE *resource_ptr;
 NX_WEB_HTTP_CLIENT *https_client_ptr;
@@ -2790,16 +2814,21 @@ NX_PACKET *packet_ptr;
 NX_PACKET *cur_packet_ptr;
 
 UCHAR request_uri[128];
-UINT request_uri_len = 0;
+UINT request_uri_len;
 UCHAR request_body[128];
-UINT request_body_len = 0;
+UINT request_body_len;
 UINT get_status;
 
-UCHAR receive_buffer[500];
+
+UCHAR *buffer_ptr;
+UINT buffer_size;
+VOID *buffer_context;
+
 ULONG receive_pos = 0;
 ULONG packet_len = 0;
 ULONG retrieved;
 
+UINT bytes_copied;
 
     /* Set HTTPS Client.  */
     resource_ptr = &(hub_client_ptr -> nx_azure_iot_hub_client_resource);
@@ -2823,28 +2852,39 @@ ULONG retrieved;
         LogError(LogLiteralArgs("IoTHub File upload fail: https client creation error status: %d"), status);
         return (status);
     }
-
+    
     status = nx_web_http_client_secure_connect(https_client_ptr, &server_address, NX_WEB_HTTPS_SERVER_PORT,
                                                 nx_azure_iot_https_tls_setup, wait_option);
-    if (status != NX_SUCCESS) // TODO: support non blocking
+    if (status != NX_SUCCESS)
     {
         LogError(LogLiteralArgs("IoTHub File upload fail: connect status: %d"), status);
         nx_web_http_client_delete(https_client_ptr);
         return(status);
     }
 
-    nx_az_iot_hub_client_get_file_upload_request_uri(&(hub_client_ptr -> iot_hub_client_core), 
-                                                     request_uri, 
-                                                     sizeof(request_uri), 
-                                                     &request_uri_len);
+    /* construct request uri */
+    // TODO: move to az_iot client
+    core_result = az_iot_hub_client_get_file_upload_request_uri(&(hub_client_ptr -> iot_hub_client_core), 
+                                                                (char *)request_uri,
+                                                                sizeof(request_uri), 
+                                                                &request_uri_len);
+    if (az_result_failed(core_result))
+    {
+        LogError(LogLiteralArgs("IoTHub client failed initialization with error status: %d"), core_result);
+        return(NX_AZURE_IOT_INSUFFICIENT_BUFFER_SPACE);
+    }
 
-
-
-    nx_az_iot_hub_client_get_file_upload_request_body(blob,
-                                                      blob_length,
-                                                      request_body, 
-                                                      sizeof(request_body), 
-                                                      &request_body_len);
+    status = nx_az_iot_hub_client_construct_file_upload_request_body(target_blob,
+                                                                     target_blob_len,
+                                                                     request_body,
+                                                                     sizeof(request_body), 
+                                                                     &request_body_len);
+    if (status != NX_SUCCESS)
+    {
+        LogError(LogLiteralArgs("IoTHub File upload fail: request body error status: %d"), status);
+        nx_web_http_client_delete(https_client_ptr);
+        return(status);
+    }
 
     /* Initialize HTTP request. */
     status = nx_web_http_client_request_initialize_extended(https_client_ptr,
@@ -2910,6 +2950,15 @@ ULONG retrieved;
 
     nx_packet_release(packet_ptr);
 
+    status = nx_azure_iot_buffer_allocate(hub_client_ptr -> nx_azure_iot_ptr,
+                                          &buffer_ptr, &buffer_size, &buffer_context);
+    if (status != NX_SUCCESS)
+    {
+        LogError(LogLiteralArgs("IoTHub File upload fail: buffer allocation error status: %d"), status);
+        nx_web_http_client_delete(https_client_ptr);
+        return(status);
+    }
+
     do {
 
         get_status = nx_web_http_client_response_body_get(https_client_ptr, &packet_ptr, wait_option);
@@ -2924,14 +2973,14 @@ ULONG retrieved;
 #endif /* NX_DISABLE_PACKET_CHAIN  */
 
                 nx_packet_length_get(cur_packet_ptr, &packet_len);
-                if (packet_len > (sizeof(receive_buffer) - 1))
+                if (packet_len > (buffer_size - 1))
                 {
                     LogError(LogLiteralArgs("IoTHub File upload fail: receive buffer size is too small"));
                     nx_web_http_client_delete(https_client_ptr);
-                    return(NX_SIZE_ERROR);
+                    return(NX_AZURE_IOT_INSUFFICIENT_BUFFER_SPACE);
                 }
 
-                status = nx_packet_data_retrieve(cur_packet_ptr, &receive_buffer[receive_pos], &retrieved);
+                status = nx_packet_data_retrieve(cur_packet_ptr, &buffer_ptr[receive_pos], &retrieved);
                 if(status != NX_SUCCESS) 
                 {
                     LogError(LogLiteralArgs("IoTHub File upload fail: data retrieve error status: %d"), status);
@@ -2957,12 +3006,357 @@ ULONG retrieved;
 
     } while (get_status != NX_WEB_HTTP_GET_DONE);
 
+    buffer_ptr[receive_pos] = '\0';
+
     LogInfo(LogLiteralArgs("Receive bytes: %d"), receive_pos);
-    receive_buffer[receive_pos] = '\0';
-    LogInfo(LogLiteralArgs("Content: %s"), receive_buffer, receive_pos);
+    LogInfo(LogLiteralArgs("Content: %s"), buffer_ptr, receive_pos);
 
-    // TODO: Copy data out of receive_buffer
+    NX_AZURE_IOT_JSON_READER json_reader;
+    nx_azure_iot_json_reader_with_buffer_init(&json_reader, buffer_ptr, receive_pos);
 
+    /* Skip the first begin object. */
+    if ((nx_azure_iot_json_reader_next_token(&json_reader) != NX_AZURE_IOT_SUCCESS) ||
+        (nx_azure_iot_json_reader_token_type(&json_reader) != NX_AZURE_IOT_READER_TOKEN_BEGIN_OBJECT))
+    {
+        LogError(LogLiteralArgs("IoTHub File upload fail: JSON parser error"));
+        nx_web_http_client_delete(https_client_ptr);
+        return(NX_FALSE);
+    }
+
+    /* Loop to process all data. */
+    while (nx_azure_iot_json_reader_next_token(&json_reader) == NX_AZURE_IOT_SUCCESS)
+    {
+        if (nx_azure_iot_json_reader_token_type(&json_reader) == NX_AZURE_IOT_READER_TOKEN_PROPERTY_NAME)
+        {
+            if (nx_azure_iot_json_reader_token_is_text_equal(&json_reader, (UCHAR *)"correlationId", sizeof("correlationId") - 1))
+            {
+                if (nx_azure_iot_json_reader_next_token(&json_reader) ||
+                    nx_azure_iot_json_reader_token_string_get(&json_reader,
+                                                              correlation_id,
+                                                              correlation_id_max_len,
+                                                              &bytes_copied))
+                {
+                    LogError(LogLiteralArgs("IoTHub File upload fail: JSON parser error"));
+                    return(NX_FALSE);
+                }
+            }
+            else if (nx_azure_iot_json_reader_token_is_text_equal(&json_reader, (UCHAR *)"hostName", sizeof("hostName") - 1))
+            {
+                if (nx_azure_iot_json_reader_next_token(&json_reader) ||
+                    nx_azure_iot_json_reader_token_string_get(&json_reader,
+                                                              host_name,
+                                                              host_name_max_len,
+                                                              &bytes_copied))
+                {
+                    LogError(LogLiteralArgs("IoTHub File upload fail: JSON parser error"));
+                    return(NX_FALSE);
+                }
+            }
+            else if (nx_azure_iot_json_reader_token_is_text_equal(&json_reader, (UCHAR *)"containerName", sizeof("containerName") - 1))
+            {
+                if (nx_azure_iot_json_reader_next_token(&json_reader) ||
+                    nx_azure_iot_json_reader_token_string_get(&json_reader,
+                                                              container,
+                                                              container_max_len,
+                                                              &bytes_copied))
+                {
+                    LogError(LogLiteralArgs("IoTHub File upload fail: JSON parser error"));
+                    return(NX_FALSE);
+                }
+            }
+            else if (nx_azure_iot_json_reader_token_is_text_equal(&json_reader, (UCHAR *)"blobName", sizeof("blobName") - 1))
+            {
+                if (nx_azure_iot_json_reader_next_token(&json_reader) ||
+                    nx_azure_iot_json_reader_token_string_get(&json_reader,
+                                                              blob_name,
+                                                              blob_name_max_len,
+                                                              &bytes_copied))
+                {
+                    LogError(LogLiteralArgs("IoTHub File upload fail: JSON parser error"));
+                    return(NX_FALSE);
+                }
+            }
+            else if (nx_azure_iot_json_reader_token_is_text_equal(&json_reader, (UCHAR *)"sasToken", sizeof("sasToken") - 1))
+            {
+                if (nx_azure_iot_json_reader_next_token(&json_reader) ||
+                    nx_azure_iot_json_reader_token_string_get(&json_reader,
+                                                              sas_token,
+                                                              sas_token_max_len,
+                                                              &bytes_copied))
+                {
+                    LogError(LogLiteralArgs("IoTHub File upload fail: JSON parser error"));
+                    return(NX_FALSE);
+                }
+            }
+            else
+            {
+                return(NX_FALSE);
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    nx_azure_iot_buffer_free(buffer_context);
     return nx_web_http_client_delete(https_client_ptr);
 }
+
+static az_result az_iot_hub_client_file_upload_get_notify_uri(az_iot_hub_client const* client,
+                                                              char *notify_uri_buf,
+                                                              size_t notify_uri_size,
+                                                              size_t *out_notify_uri_len)
+{
+    az_span notify_uri_span = az_span_create((uint8_t *)notify_uri_buf, (int32_t)notify_uri_size);
+
+    int32_t required_len = az_span_size(devices_str_span) 
+        + (int32_t)sizeof(hub_client_forward_slash) + az_span_size(client->_internal.device_id) 
+        + az_span_size(files_str_span) + az_span_size(notifications_str_span) 
+        + az_span_size(api_version_span);
+
+    if (notify_uri_size < required_len + (int32_t)sizeof(null_terminator)) 
+    {
+        return AZ_ERROR_NOT_ENOUGH_SPACE;
+    }
+
+    az_span remainder = az_span_copy(notify_uri_span, devices_str_span);
+    remainder = az_span_copy_u8(remainder, hub_client_forward_slash);
+    remainder = az_span_copy(remainder, client->_internal.device_id);
+    remainder = az_span_copy(remainder, files_str_span);
+    remainder = az_span_copy(remainder, notifications_str_span);
+    remainder = az_span_copy(remainder, api_version_span);    
+    remainder = az_span_copy_u8(remainder, null_terminator);
+
+    if (out_notify_uri_len)
+    {
+        *out_notify_uri_len = required_len;
+    }
+
+    return AZ_OK;
+}
+
+UINT nx_az_iot_hub_client_file_upload_construct_notify_body(UCHAR *correlation_id, UINT correlation_id_len,
+                                                            UINT is_success, 
+                                                            INT status_code, 
+                                                            UCHAR *description, UINT description_len,
+                                                            UCHAR *notify_body_buf, UINT notify_body_size,
+                                                            UINT *out_notify_body_len)
+{
+NX_AZURE_IOT_JSON_WRITER json_writer;
+UINT status;
+UINT bytes_used;
+
+    status = nx_azure_iot_json_writer_with_buffer_init(&json_writer, notify_body_buf, notify_body_size);
+    if (status != NX_SUCCESS) {
+        return(status);
+    }
+
+    status = nx_azure_iot_json_writer_append_begin_object(&json_writer);
+    if (status != NX_SUCCESS) 
+    {
+        return(status);
+    }
+
+    status = nx_azure_iot_json_writer_append_property_with_string_value(&json_writer, 
+        "correlationId", sizeof("correlationId") - 1, correlation_id, correlation_id_len);
+    if (status != NX_SUCCESS) 
+    {
+        return(status);
+    }
+
+    status = nx_azure_iot_json_writer_append_property_with_bool_value(&json_writer, 
+        "isSuccess", sizeof("isSuccess") - 1, is_success);
+    if (status != NX_SUCCESS) 
+    {
+        return(status);
+    }
+
+    status = nx_azure_iot_json_writer_append_property_with_int32_value(&json_writer, 
+        "statusCode", sizeof("statusCode") - 1, status_code);
+    if (status != NX_SUCCESS) 
+    {
+        return(status);
+    }
+
+    status = nx_azure_iot_json_writer_append_property_with_string_value(&json_writer, 
+        "description", sizeof("description") - 1, description, description_len);
+    if (status != NX_SUCCESS) 
+    {
+        return(status);
+    }            
+
+    status = nx_azure_iot_json_writer_append_end_object(&json_writer);
+    if (status != NX_SUCCESS) 
+    {
+        return(status);
+    }
+
+    bytes_used = nx_azure_iot_json_writer_get_bytes_used(&json_writer);
+    if (bytes_used > notify_body_size) 
+    {
+        return(NX_AZURE_IOT_INSUFFICIENT_BUFFER_SPACE);
+    } 
+    else 
+    {
+        *out_notify_body_len = bytes_used;
+        return(NX_SUCCESS);
+    }
+}
+
+UINT nx_azure_iot_hub_file_upload_notify_complete(NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr,
+                                                  UCHAR *correlation_id, UINT correlation_id_len,
+                                                  UINT is_success, 
+                                                  UINT status_code, 
+                                                  UCHAR *description, UINT description_len,
+                                                  UINT wait_option)
+{
+UINT status;
+az_result core_result;
+NXD_ADDRESS server_address;
+
+NX_AZURE_IOT_RESOURCE *resource_ptr;
+NX_WEB_HTTP_CLIENT *https_client_ptr;
+NX_PACKET *packet_ptr;
+
+UCHAR notify_uri[128];
+UINT notify_uri_len;
+UCHAR notify_body[256];
+UINT notify_body_len;
+
+    /* Set HTTPS Client.  */
+    resource_ptr = &(hub_client_ptr -> nx_azure_iot_hub_client_resource);
+    https_client_ptr = &(resource_ptr -> resource_https);
+
+    /* Resolve the host name.  */
+    /* Note: always using default dns timeout.  */
+    status = nxd_dns_host_by_name_get(hub_client_ptr -> nx_azure_iot_ptr -> nx_azure_iot_dns_ptr,
+                                      (UCHAR *)resource_ptr -> resource_hostname,
+                                      &server_address, NX_AZURE_IOT_HUB_CLIENT_DNS_TIMEOUT, NX_IP_VERSION_V4);
+    if (status)
+    {
+        LogError(LogLiteralArgs("IoTHub File upload fail: dns solve error status: %d"), status);
+        return(status);
+    }
+
+    if (status = nx_web_http_client_create(https_client_ptr, "https client", 
+                                           hub_client_ptr -> nx_azure_iot_ptr -> nx_azure_iot_ip_ptr,
+                                           hub_client_ptr -> nx_azure_iot_ptr -> nx_azure_iot_pool_ptr, 8192))
+    {
+        LogError(LogLiteralArgs("IoTHub File upload fail: https client creation error status: %d"), status);
+        return (status);
+    }
+
+    status = nx_web_http_client_secure_connect(https_client_ptr, &server_address, NX_WEB_HTTPS_SERVER_PORT,
+                                                nx_azure_iot_https_tls_setup, wait_option);
+    if (status != NX_SUCCESS) // TODO: support non blocking
+    {
+        LogError(LogLiteralArgs("IoTHub File upload fail: connect status: %d"), status);
+        nx_web_http_client_delete(https_client_ptr);
+        return(status);
+    }
+
+    core_result = az_iot_hub_client_file_upload_get_notify_uri(&(hub_client_ptr -> iot_hub_client_core), 
+                                                               (char *)notify_uri,
+                                                               sizeof(notify_uri),
+                                                               &notify_uri_len);
+    if (az_result_failed(core_result))
+    {
+        LogError(LogLiteralArgs("IoTHub client failed initialization with error status: %d"), core_result);
+        return(NX_AZURE_IOT_INSUFFICIENT_BUFFER_SPACE);
+    }
+
+    status = nx_az_iot_hub_client_file_upload_construct_notify_body(correlation_id, correlation_id_len,
+                                                                    is_success, 
+                                                                    status_code, 
+                                                                    description, description_len,
+                                                                    notify_body, sizeof(notify_body), 
+                                                                    &notify_body_len);
+    if (status != NX_SUCCESS)
+    {
+        LogError(LogLiteralArgs("IoTHub File upload fail: notify body error status: %d"), status);
+        nx_web_http_client_delete(https_client_ptr);
+        return(status);
+    }
+
+    /* Initialize HTTP request. */
+    status = nx_web_http_client_request_initialize_extended(https_client_ptr,
+                                                            NX_WEB_HTTP_METHOD_POST,
+                                                            (CHAR *)&notify_uri[0],
+                                                            notify_uri_len,
+                                                            (CHAR *)resource_ptr -> resource_hostname,
+                                                            resource_ptr -> resource_hostname_length,
+                                                            notify_body_len,
+                                                            NX_FALSE,
+                                                            NX_NULL, 0, NULL, 0, wait_option);
+    if (status != NX_SUCCESS)
+    {
+        LogError(LogLiteralArgs("IoTHub File upload fail: request initialization error status: %d"), status);
+        nx_web_http_client_delete(https_client_ptr);
+        return(status);
+    }
+
+    /* Content-Type: application/json is required custom header for Azure IoT REST API */
+    status = nx_web_http_client_request_header_add(https_client_ptr, 
+                                                   "Content-Type", sizeof("Content-Type") - 1, 
+                                                   "application/json", sizeof("application/json") - 1, 
+                                                   NX_NO_WAIT);
+    if (status != NX_SUCCESS)
+    {
+        LogError(LogLiteralArgs("IoTHub File upload fail: request header adding error status: %d"), status);
+        nx_web_http_client_delete(https_client_ptr);
+        return(status);
+    }
+
+    /* Send the HTTP request we just built. */
+    status = nx_web_http_client_request_send(https_client_ptr, NX_WAIT_FOREVER);
+    if (status != NX_SUCCESS)
+    {
+        LogError(LogLiteralArgs("IoTHub File upload fail: request sending error status: %d"), status);
+        nx_web_http_client_delete(https_client_ptr);
+        return(status);
+    }
+
+    status = nx_web_http_client_request_packet_allocate(https_client_ptr, &packet_ptr, wait_option);
+    if (status != NX_SUCCESS)
+    {
+        LogError(LogLiteralArgs("IoTHub File upload fail: packet allocation error status: %d"), status);
+        nx_web_http_client_delete(https_client_ptr);
+        return(status);
+    }
+
+    status = nx_packet_data_append(packet_ptr, &notify_body[0], notify_body_len, hub_client_ptr -> nx_azure_iot_ptr -> nx_azure_iot_pool_ptr, NX_WAIT_FOREVER);
+    if (status != NX_SUCCESS)
+    {
+        LogError(LogLiteralArgs("IoTHub File upload fail: data append error status: %d"), status);
+        nx_web_http_client_delete(https_client_ptr); // TODO: confirm if client is deleted, should we free the packet allocated from the pool
+        return(status);
+    }
+
+    status = nx_web_http_client_put_packet(https_client_ptr, packet_ptr, wait_option);
+    if (status != NX_SUCCESS)
+    {
+        LogError(LogLiteralArgs("IoTHub File upload fail: put packet error status: %d"), status);
+        nx_web_http_client_delete(https_client_ptr);
+        return(status);
+    }
+
+    nx_packet_release(packet_ptr);
+
+    status = nx_web_http_client_response_body_get(https_client_ptr, &packet_ptr, wait_option);
+
+    /* release packet because (according to the protocol) there is no response body */
+    nx_packet_release(packet_ptr);
+
+    /* there is no way to retrieve HTTP Code from response header, always expect NX_WEB_HTTP_GET_DONE or error */
+    if (status != NX_WEB_HTTP_GET_DONE) {
+        LogError(LogLiteralArgs("IoTHub File upload fail: notify response error status: %d"), status);
+        nx_web_http_client_delete(https_client_ptr);
+        return(status);
+    }
+
+    nx_web_http_client_delete(https_client_ptr);
+    return(NX_AZURE_IOT_SUCCESS);
+}
+
 #endif

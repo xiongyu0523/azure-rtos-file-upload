@@ -34,6 +34,8 @@ extern   "C" {
 #include "nxd_dns.h"
 #include "nxd_mqtt_client.h"
 #ifdef NX_AZURE_IOT_FILE_UPLOAD
+#include "nx_azure_iot_json_writer.h"
+#include "nx_azure_iot_json_reader.h"
 #include "nx_web_http_client.h"
 #endif
 
@@ -686,11 +688,21 @@ UINT nx_azure_iot_hub_client_direct_method_message_response(NX_AZURE_IOT_HUB_CLI
 
 #ifdef NX_AZURE_IOT_FILE_UPLOAD
 UINT nx_azure_iot_hub_file_upload_retrieve_sas_uri(NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr,
-                                                   UCHAR *blob, UINT blob_length, 
-                                                   UCHAR *hostname, UINT hostname_length, 
-                                                   UCHAR *container, UINT container_length, 
-                                                   UCHAR *sas, UINT sas_length, 
+                                                   UCHAR *target_blob, UINT target_blob_len,
+                                                   UCHAR *correlation_id, UINT correlation_id_max_len,
+                                                   UCHAR *host_name, UINT host_name_max_len,
+                                                   UCHAR *container, UINT container_max_len,
+                                                   UCHAR *blob_name, UINT blob_name_max_len,
+                                                   UCHAR *sas_token, UINT sas_token_max_len,
                                                    UINT wait_option);
+
+UINT nx_azure_iot_hub_file_upload_notify_complete(NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr,
+                                                  UCHAR *correlation_id, UINT correlation_id_len,
+                                                  UINT is_success, 
+                                                  UINT status_code, 
+                                                  UCHAR *description, UINT description_len,
+                                                  UINT wait_option);
+
 #endif /* NX_AZURE_IOT_FILE_UPLOAD */
 
 #ifdef __cplusplus

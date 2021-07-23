@@ -141,7 +141,7 @@ UINT nx_azure_iot_log(UCHAR *type_ptr, UINT type_len, UCHAR *msg_ptr, UINT msg_l
 
 /* Define the packet buffer for THREADX TLS.  */
 #ifndef NX_AZURE_IOT_TLS_PACKET_BUFFER_SIZE
-#define NX_AZURE_IOT_TLS_PACKET_BUFFER_SIZE               (1024 * 7)
+#define NX_AZURE_IOT_TLS_PACKET_BUFFER_SIZE               (1024 * 16)
 #endif /* NX_AZURE_IOT_TLS_PACKET_BUFFER_SIZE  */
 
 /* Define MQTT keep alive in seconds. 0 means the keep alive is disabled.
