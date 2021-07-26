@@ -710,17 +710,17 @@ NX_AZURE_IOT_RESOURCE *resource_ptr;
     return(NX_SUCCESS);
 }
 
-UINT sample_file_upload(UCHAR *host_name, UINT host_name_len, UCHAR *uri, UINT uri_len, UINT wait_option)
+UINT sample_file_upload(UCHAR *file_content, UINT file_content_len, 
+                        UCHAR *host_name, UINT host_name_len, 
+                        UCHAR *full_uri, UINT full_uri_len, 
+                        UINT wait_option)
 {
 UINT status;
 NXD_ADDRESS server_address;
-
 NX_AZURE_IOT_RESOURCE *resource_ptr;
 NX_WEB_HTTP_CLIENT *https_client_ptr;
 NX_PACKET *packet_ptr;
-
-CHAR file_content[] = "Hello World";
-CHAR file_length[] = "11";
+CHAR file_length_str[10];
 
     /* reuse related resources within azure iot hub client */
 
@@ -728,19 +728,17 @@ CHAR file_length[] = "11";
     https_client_ptr = &(resource_ptr -> resource_https);
 
     status = nxd_dns_host_by_name_get(iothub_client.nx_azure_iot_ptr -> nx_azure_iot_dns_ptr,
-                                      host_name,
-                                      &server_address, NX_AZURE_IOT_HUB_CLIENT_DNS_TIMEOUT, NX_IP_VERSION_V4);
-    if (status)
+                                      host_name, &server_address, NX_AZURE_IOT_HUB_CLIENT_DNS_TIMEOUT, NX_IP_VERSION_V4);
+    if (status != NX_SUCCESS)
     {
-        printf("File upload fail: dns solve error status: %d", status);
         return(status);
     }
 
-    if (status = nx_web_http_client_create(https_client_ptr, "azblob https client", 
+    status = nx_web_http_client_create(https_client_ptr, "user https client", 
                                            iothub_client.nx_azure_iot_ptr -> nx_azure_iot_ip_ptr,
-                                           iothub_client.nx_azure_iot_ptr -> nx_azure_iot_pool_ptr, 8192))
+                                           iothub_client.nx_azure_iot_ptr -> nx_azure_iot_pool_ptr, 8192);
+    if (status != NX_SUCCESS)
     {
-        printf("File upload fail: https client creation error status: %d", status);
         return(status);
     }
 
@@ -748,34 +746,33 @@ CHAR file_length[] = "11";
                                                 _azure_blob_https_tls_setup, wait_option);
     if (status != NX_SUCCESS)
     {
-        printf("IoTHub File upload fail: connect status: %d", status);
         nx_web_http_client_delete(https_client_ptr);
         return(status);
     }
 
     status = nx_web_http_client_request_initialize_extended(https_client_ptr,
                                                             NX_WEB_HTTP_METHOD_PUT,
-                                                            (CHAR *)&uri[0],
-                                                            uri_len,
+                                                            (CHAR *)&full_uri[0],
+                                                            full_uri_len,
                                                             (CHAR *)host_name,
                                                             host_name_len,
-                                                            sizeof(file_content) - 1,
+                                                            file_content_len,
                                                             NX_FALSE,
                                                             NX_NULL, 0, NULL, 0, wait_option);
     if (status != NX_SUCCESS)
     {
-        printf("File upload fail: request initialization error status: %d", status);
         nx_web_http_client_delete(https_client_ptr);
         return(status);
     }
 
-    status = nx_web_http_client_request_header_add(https_client_ptr, "x-ms-blob-type", sizeof("x-ms-blob-type") - 1, "BlockBlob", sizeof("BlockBlob") - 1, NX_NO_WAIT);
-    status += nx_web_http_client_request_header_add(https_client_ptr, "x-ms-date", sizeof("x-ms-date") - 1, "Fri, 23 Jul 2021 06:12:12 GMT", sizeof("Fri, 23 Jul 2021 05:55:12 GMT") - 1, NX_NO_WAIT);
-    status += nx_web_http_client_request_header_add(https_client_ptr, "x-ms-version", sizeof("x-ms-version") - 1, "2020-10-02", sizeof("2020-10-02") - 1, NX_NO_WAIT);
-    status += nx_web_http_client_request_header_add(https_client_ptr, "Content-Length", sizeof("Content-Length") - 1, file_length, sizeof(file_length) - 1, NX_NO_WAIT);
+    snprintf(file_length_str, 10, "%d", file_content_len);
+
+    status = nx_web_http_client_request_header_add(https_client_ptr, "x-ms-blob-type", sizeof("x-ms-blob-type") - 1, "BlockBlob", sizeof("BlockBlob") - 1, wait_option);
+    status += nx_web_http_client_request_header_add(https_client_ptr, "x-ms-date", sizeof("x-ms-date") - 1, "Fri, 23 Jul 2021 06:12:12 GMT", sizeof("Fri, 23 Jul 2021 05:55:12 GMT") - 1, wait_option);
+    status += nx_web_http_client_request_header_add(https_client_ptr, "x-ms-version", sizeof("x-ms-version") - 1, "2020-10-02", sizeof("2020-10-02") - 1, wait_option);
+    status += nx_web_http_client_request_header_add(https_client_ptr, "Content-Length", sizeof("Content-Length") - 1, file_length_str, strlen(file_length_str), wait_option);
     if (status != NX_SUCCESS)
     {
-        printf("File upload fail: request header adding error status: %d", status);
         nx_web_http_client_delete(https_client_ptr);
         return(status);
     }
@@ -783,7 +780,6 @@ CHAR file_length[] = "11";
     status = nx_web_http_client_request_send(https_client_ptr, wait_option);
     if (status != NX_SUCCESS)
     {
-        printf("File upload fail: request sending error status: %d", status);
         nx_web_http_client_delete(https_client_ptr);
         return(status);
     }
@@ -791,15 +787,14 @@ CHAR file_length[] = "11";
     status = nx_web_http_client_request_packet_allocate(https_client_ptr, &packet_ptr, wait_option);
     if (status != NX_SUCCESS)
     {
-        printf("File upload fail: packet allocation error status: %d", status);
         nx_web_http_client_delete(https_client_ptr);
         return(status);
     }
 
-    status = nx_packet_data_append(packet_ptr, &file_content[0], sizeof(file_content) - 1, iothub_client.nx_azure_iot_ptr -> nx_azure_iot_pool_ptr, NX_WAIT_FOREVER);
+    status = nx_packet_data_append(packet_ptr, file_content, file_content_len, iothub_client.nx_azure_iot_ptr -> nx_azure_iot_pool_ptr, wait_option);
     if (status != NX_SUCCESS)
     {
-        printf("File upload fail: data append error status: %d", status);
+        nx_packet_release(packet_ptr);
         nx_web_http_client_delete(https_client_ptr); 
         return(status);
     }
@@ -807,7 +802,7 @@ CHAR file_length[] = "11";
     status = nx_web_http_client_put_packet(https_client_ptr, packet_ptr, wait_option);
     if (status != NX_SUCCESS)
     {
-        printf("File upload fail: put packet error status: %d", status);
+        nx_packet_release(packet_ptr);
         nx_web_http_client_delete(https_client_ptr);
         return(status);
     }
@@ -817,7 +812,6 @@ CHAR file_length[] = "11";
     status = nx_web_http_client_response_body_get(https_client_ptr, &packet_ptr, wait_option);
     nx_packet_release(packet_ptr);
     if (status != NX_WEB_HTTP_GET_DONE) {
-        printf("File upload fail: response error status: %d", status);
         nx_web_http_client_delete(https_client_ptr);
         return(status);
     }
@@ -828,17 +822,12 @@ CHAR file_length[] = "11";
 
 void sample_file_upload_thread_entry(ULONG parameter)
 {
-#define MAX_CORRELATION_ID_LEN  200
-#define MAX_HOST_NAME_LEN       50
-#define MAX_CONTAINER_LEN       50
-#define MAX_BLOB_NAME_LEN       50
-#define MAX_SASTOKEN_LEN        150
-UCHAR correlation_id[MAX_CORRELATION_ID_LEN];
-UCHAR host_name[MAX_HOST_NAME_LEN];
-UCHAR container[MAX_CONTAINER_LEN];
-UCHAR blob_name[MAX_BLOB_NAME_LEN];
-UCHAR sas_token[MAX_SASTOKEN_LEN];
-UCHAR uri[MAX_CONTAINER_LEN + MAX_BLOB_NAME_LEN + MAX_SASTOKEN_LEN];
+UCHAR correlation_id[128];
+UCHAR host_name[64];
+UCHAR container[64];
+UCHAR blob_name[64];
+UCHAR sas_token[128];
+UCHAR full_uri[256];
 
 UINT status;
 UINT is_success;
@@ -852,31 +841,36 @@ UINT is_success;
         memset(sas_token, 0, sizeof(sas_token));
 
         status = nx_azure_iot_hub_file_upload_retrieve_sas_uri(&iothub_client, 
-                                                               "20210719/test.txt", sizeof("20210719/test.txt")-1, 
-                                                               correlation_id, MAX_CORRELATION_ID_LEN,
-                                                               host_name, MAX_HOST_NAME_LEN,
-                                                               container, MAX_CONTAINER_LEN,
-                                                               blob_name, MAX_BLOB_NAME_LEN,
-                                                               sas_token, MAX_SASTOKEN_LEN,
+                                                               "test.txt", sizeof("test.txt") - 1, 
+                                                               correlation_id, sizeof(correlation_id),
+                                                               host_name, sizeof(host_name),
+                                                               container, sizeof(container),
+                                                               blob_name, sizeof(blob_name),
+                                                               sas_token, sizeof(sas_token),
                                                                NX_WAIT_FOREVER);
 
         if (status != NX_AZURE_IOT_SUCCESS)
         {
+            printf("Failed to retrieve URI and SAS token from IoT Hub!: error code = 0x%08x\r\n", status);
+            printf("Retry...");
             continue;
         }
 
-        /* construct full URI (without hostname) */ 
-        strcpy((char *)uri, "/");
-        strcat((char *)uri, (char *)container);
-        strcat((char *)uri, (char *)"/");
-        strcat((char *)uri, (char *)blob_name);
-        strcat((char *)uri, (char *)sas_token);
+        printf("Successfully retrieve sas token and uri from IoT Hub\r\n");
 
-        printf("Start file upload!\r\n");
+        /* construct full URI (without hostname) */ 
+        strcpy((char *)full_uri, "/");
+        strcat((char *)full_uri, (char *)container);
+        strcat((char *)full_uri, (char *)"/");
+        strcat((char *)full_uri, (char *)blob_name);
+        strcat((char *)full_uri, (char *)sas_token);
+
+        printf("Start file upload to %s/%s/%s\r\n", host_name, container, blob_name);
         
         /* Make a HTTP PUT blob REST API call */
-        status = sample_file_upload(host_name, strlen((char *)host_name), 
-                                    uri, strlen((char *)uri),
+        status = sample_file_upload("A example of file upload", sizeof("A example of file upload") - 1,
+                                    host_name, strlen((char *)host_name), 
+                                    full_uri, strlen((char *)full_uri),
                                     NX_WAIT_FOREVER);
         if (status == NX_SUCCESS) 
         {
@@ -897,7 +891,7 @@ UINT is_success;
                                                               NX_WAIT_FOREVER);
         if (status == NX_SUCCESS) 
         {
-            printf("Successfully notified IoT Hub on file upload status\r\n");
+            printf("Successfully notify IoT Hub for file upload status\r\n");
         }
         else
         {

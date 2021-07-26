@@ -687,6 +687,30 @@ UINT nx_azure_iot_hub_client_direct_method_message_response(NX_AZURE_IOT_HUB_CLI
                                                             UINT payload_length, UINT wait_option);
 
 #ifdef NX_AZURE_IOT_FILE_UPLOAD
+/**
+ * @brief Retrieve blob SAS token and URI from IoT Hub 
+ * @details This routine send file upload request to IoT Hub to retrieve blob sas token and URI.
+ *
+ * @param[in] hub_client_ptr A pointer to a #NX_AZURE_IOT_HUB_CLIENT.
+ * @param[in] target_blob Pointer to blob file name.
+ * @param[in] target_blob_len Length of blob file name.
+ * @param[out] correlation_id Pointer to the buffer to hold correlation id.
+ * @param[in] correlation_id_max_len Maximum length of the correlation id buffer.
+ * @param[out] host_name Pointer to the buffer to hold host name.
+ * @param[in] host_name_max_len Maximum length of the host name buffer (null is not included).
+ * @param[out] container Pointer to the buffer to hold container name.
+ * @param[in] container_max_len Maximum length of the container name buffer (null is not included).
+ * @param[out] blob_name Pointer to the buffer to hold blob name.
+ * @param[in] blob_name_max_len Maximum length of the blob name buffer (null is not included).
+ * @param[out] sas_token Pointer to the buffer to hold sas token.
+ * @param[in] sas_token_max_len Maximum length of the sas token buffer (null is not included).
+ * @param[in] wait_option Ticks to wait for API to complete.
+ * @return A `UINT` with the result of the API.
+ *   @retval #NX_AZURE_IOT_SUCCESS Successful if expected response is received and copied.
+ *   @retval #NX_AZURE_IOT_INVALID_PARAMETER Fail due to invalid parameter.
+ *   @retval #NX_AZURE_IOT_SDK_CORE_ERROR Fail due to SDK core error.
+ *   @retval NX_AZURE_IOT_INSUFFICIENT_BUFFER_SPACE Fail due to insufficient buffer space.
+ */
 UINT nx_azure_iot_hub_file_upload_retrieve_sas_uri(NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr,
                                                    UCHAR *target_blob, UINT target_blob_len,
                                                    UCHAR *correlation_id, UINT correlation_id_max_len,
@@ -696,6 +720,24 @@ UINT nx_azure_iot_hub_file_upload_retrieve_sas_uri(NX_AZURE_IOT_HUB_CLIENT *hub_
                                                    UCHAR *sas_token, UINT sas_token_max_len,
                                                    UINT wait_option);
 
+/**
+ * @brief Send file upload complete notification to IoT Hub. 
+ * @details This routine send file upload complete notificaiton to IoT Hub.
+ *
+ * @param[in] hub_client_ptr A pointer to a #NX_AZURE_IOT_HUB_CLIENT.
+ * @param[in] correlation_id Pointer to the buffer to hold correlation id.
+ * @param[in] correlation_id_max_len Length of the correlation id buffer.
+ * @param[in] is_success Boolean that indicates whether the file was uploaded successfully.
+ * @param[in] status_code Status code report to IoT Hub.
+ * @param[in] description Pointer to the buffer to hold description.
+ * @param[in] description_len Length of the description buffer.
+ * @param[in] wait_option Ticks to wait for API to complete.
+ * @return A `UINT` with the result of the API.
+ *   @retval #NX_AZURE_IOT_SUCCESS Successful if notificaiton is complete wihtout error.
+ *   @retval #NX_AZURE_IOT_INVALID_PARAMETER Fail due to invalid parameter.
+ *   @retval #NX_AZURE_IOT_SDK_CORE_ERROR Fail due to SDK core error.
+ *   @retval NX_AZURE_IOT_INSUFFICIENT_BUFFER_SPACE Fail due to insufficient buffer space.
+ */
 UINT nx_azure_iot_hub_file_upload_notify_complete(NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr,
                                                   UCHAR *correlation_id, UINT correlation_id_len,
                                                   UINT is_success, 
