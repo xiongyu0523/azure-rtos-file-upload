@@ -2,6 +2,8 @@
 
 This project add file upload feature to [Azure IoT Middleware for Azure RTOS](https://github.com/azure-rtos/netxduo/tree/master/addons/azure_iot) and provide a sample code on top of [Azure_RTOS_6.1_STM32L4+-DISCO_IAR_Samples_2020_10_10.zip](https://github.com/azure-rtos/samples/releases/download/v6.1_rel/Azure_RTOS_6.1_STM32L4+-DISCO_IAR_Samples_2020_10_10.zip) package. 
 
+Refer to [IoT hub document](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-file-upload) to understand IoT Hub file upload feature.
+
 ## Prerequisites
 
 1. [STM32L4+ Discovery Kit IoT node](https://www.st.com/en/evaluation-tools/b-l4s5i-iot01a.html)
