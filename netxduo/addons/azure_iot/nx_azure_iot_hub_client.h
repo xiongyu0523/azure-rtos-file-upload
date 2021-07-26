@@ -33,11 +33,9 @@ extern   "C" {
 #include "nx_cloud.h"
 #include "nxd_dns.h"
 #include "nxd_mqtt_client.h"
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
-#include "nx_azure_iot_json_writer.h"
-#include "nx_azure_iot_json_reader.h"
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
 #include "nx_web_http_client.h"
-#endif
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
 
 /**< Value denoting a message is of "None" type */
 #define NX_AZURE_IOT_HUB_NONE                                       0x00000000
@@ -192,9 +190,9 @@ UINT nx_azure_iot_hub_client_initialize(NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr,
                                         const NX_CRYPTO_METHOD **crypto_array, UINT crypto_array_size,
                                         const NX_CRYPTO_CIPHERSUITE **cipher_map, UINT cipher_map_size,
                                         UCHAR *metadata_memory, UINT memory_size,
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE 
                                         UCHAR *https_metadata_memory, UINT https_memory_size,
-#endif
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
                                         NX_SECURE_X509_CERT *trusted_certificate);
 
 /**
@@ -686,7 +684,7 @@ UINT nx_azure_iot_hub_client_direct_method_message_response(NX_AZURE_IOT_HUB_CLI
                                                             USHORT context_length, const UCHAR *payload,
                                                             UINT payload_length, UINT wait_option);
 
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
 /**
  * @brief Retrieve blob SAS token and URI from IoT Hub 
  * @details This routine send file upload request to IoT Hub to retrieve blob sas token and URI.
@@ -745,7 +743,7 @@ UINT nx_azure_iot_hub_file_upload_notify_complete(NX_AZURE_IOT_HUB_CLIENT *hub_c
                                                   UCHAR *description, UINT description_len,
                                                   UINT wait_option);
 
-#endif /* NX_AZURE_IOT_FILE_UPLOAD */
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
 
 #ifdef __cplusplus
 }

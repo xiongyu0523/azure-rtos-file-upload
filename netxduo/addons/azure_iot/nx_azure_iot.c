@@ -199,9 +199,9 @@ NX_AZURE_IOT_RESOURCE *resource_ptr;
 
         if (
             (&(resource_ptr -> resource_mqtt) == client_ptr)
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
             || (&(resource_ptr -> resource_https) == client_ptr)
-#endif
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
            )
         {
             return(resource_ptr);
@@ -570,9 +570,9 @@ UINT status = NX_AZURE_IOT_SUCCESS;
 
         if (
             (&(resource_ptr -> resource_mqtt.nxd_mqtt_tls_session) == session)
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
             || (&(resource_ptr -> resource_https.nx_web_http_client_tls_session) == session)
-#endif
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
            )
         {
             break;
@@ -709,7 +709,7 @@ NX_AZURE_IOT_RESOURCE *resource_ptr;
     return(NX_AZURE_IOT_SUCCESS);
 }
 
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
 UINT nx_azure_iot_https_tls_setup(NX_WEB_HTTP_CLIENT *client_ptr, NX_SECURE_TLS_SESSION *tls_session)
 {
 UINT status;
@@ -779,7 +779,7 @@ NX_AZURE_IOT_RESOURCE *resource_ptr;
 
     return(NX_AZURE_IOT_SUCCESS);
 }
-#endif
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
 
 UINT nx_azure_iot_unix_time_get(NX_AZURE_IOT *nx_azure_iot_ptr, ULONG *unix_time)
 {

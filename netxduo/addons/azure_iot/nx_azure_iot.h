@@ -31,11 +31,11 @@ extern   "C" {
 #include "nxd_mqtt_client.h"
 
 /* Defined, file upload feature is eanble. By default, it is disabled. */
-#define NX_AZURE_IOT_FILE_UPLOAD
+#define NX_AZURE_IOT_FILE_UPLOAD_ENABLE
 
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
 #include "nx_web_http_client.h"
-#endif
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
 
 #ifndef NXD_MQTT_CLOUD_ENABLE
 #error "NXD_MQTT_CLOUD_ENABLE must be defined"
@@ -141,7 +141,7 @@ UINT nx_azure_iot_log(UCHAR *type_ptr, UINT type_len, UCHAR *msg_ptr, UINT msg_l
 
 /* Define the packet buffer for THREADX TLS.  */
 #ifndef NX_AZURE_IOT_TLS_PACKET_BUFFER_SIZE
-#define NX_AZURE_IOT_TLS_PACKET_BUFFER_SIZE               (1024 * 16)
+#define NX_AZURE_IOT_TLS_PACKET_BUFFER_SIZE               (1024 * 12)
 #endif /* NX_AZURE_IOT_TLS_PACKET_BUFFER_SIZE  */
 
 /* Define MQTT keep alive in seconds. 0 means the keep alive is disabled.
@@ -162,9 +162,9 @@ typedef struct NX_AZURE_IOT_RESOURCE_STRUCT
     UINT                                   resource_type;
     VOID                                  *resource_data_ptr;
     NXD_MQTT_CLIENT                        resource_mqtt;
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
     NX_WEB_HTTP_CLIENT                     resource_https;
-#endif
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
     UCHAR                                 *resource_mqtt_client_id;
     UINT                                   resource_mqtt_client_id_length;
     UCHAR                                 *resource_mqtt_user_name;
@@ -174,19 +174,19 @@ typedef struct NX_AZURE_IOT_RESOURCE_STRUCT
     VOID                                  *resource_mqtt_buffer_context;
     UINT                                   resource_mqtt_buffer_size;
     UCHAR                                  resource_tls_packet_buffer[NX_AZURE_IOT_TLS_PACKET_BUFFER_SIZE];
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
     UCHAR                                  resource_http_tls_packet_buffer[NX_AZURE_IOT_TLS_PACKET_BUFFER_SIZE];
-#endif /* NX_AZURE_IOT_FILE_UPLOAD */
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
     const NX_CRYPTO_METHOD               **resource_crypto_array;
     UINT                                   resource_crypto_array_size;
     const NX_CRYPTO_CIPHERSUITE          **resource_cipher_map;
     UINT                                   resource_cipher_map_size;
     UCHAR                                 *resource_metadata_ptr;
     UINT                                   resource_metadata_size;
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
     UCHAR                                 *resource_https_metadata_ptr;
     UINT                                   resource_https_metadata_size;
-#endif /* NX_AZURE_IOT_FILE_UPLOAD */
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
     NX_SECURE_X509_CERT                   *resource_trusted_certificate;
     NX_SECURE_X509_CERT                   *resource_device_certificate;
     const UCHAR                           *resource_hostname;
@@ -309,9 +309,9 @@ VOID nx_azure_iot_mqtt_packet_adjust(NX_PACKET *packet_ptr);
 UINT nx_azure_iot_mqtt_tls_setup(NXD_MQTT_CLIENT *client_ptr, NX_SECURE_TLS_SESSION *tls_session,
                                  NX_SECURE_X509_CERT *certificate,
                                  NX_SECURE_X509_CERT *trusted_certificate);
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
 UINT nx_azure_iot_https_tls_setup(NX_WEB_HTTP_CLIENT *client_ptr, NX_SECURE_TLS_SESSION *tls_session);
-#endif
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
                                 
 UINT nx_azure_iot_base64_hmac_sha256_calculate(NX_AZURE_IOT_RESOURCE *resource_ptr,
                                                const UCHAR *key_ptr, UINT key_size,

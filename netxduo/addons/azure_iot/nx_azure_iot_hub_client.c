@@ -15,6 +15,10 @@
 
 #include "azure/core/az_version.h"
 
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
+#include "nx_azure_iot_json_writer.h"
+#include "nx_azure_iot_json_reader.h"
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
 
 #define NX_AZURE_IOT_HUB_CLIENT_U32_MAX_BUFFER_SIZE     10
 #define NX_AZURE_IOT_HUB_CLIENT_EMPTY_JSON              "{}"
@@ -32,14 +36,14 @@
                                                 NX_AZURE_IOT_HUB_CLIENT_TO_STR(THREADX_MINOR_VERSION) "%29"
 #endif /* NX_AZURE_IOT_HUB_CLIENT_USER_AGENT */
 
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
 static const uint8_t null_terminator = '\0';
 static const uint8_t hub_client_forward_slash = '/';
 static const az_span devices_str_span = AZ_SPAN_LITERAL_FROM_STR("/devices");
 static const az_span files_str_span = AZ_SPAN_LITERAL_FROM_STR("/files");
 static const az_span notifications_str_span = AZ_SPAN_LITERAL_FROM_STR("/notifications");
 static const az_span api_version_span = AZ_SPAN_LITERAL_FROM_STR("?api-version=2020-03-13");
-#endif /* NX_AZURE_IOT_FILE_UPLOAD */
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
 
 static VOID nx_azure_iot_hub_client_received_message_cleanup(NX_AZURE_IOT_HUB_CLIENT_RECEIVE_MESSAGE *message);
 static UINT nx_azure_iot_hub_client_cloud_message_sub_unsub(NX_AZURE_IOT_HUB_CLIENT *hub_client_ptr,
@@ -138,9 +142,9 @@ UINT nx_azure_iot_hub_client_initialize(NX_AZURE_IOT_HUB_CLIENT* hub_client_ptr,
                                         const NX_CRYPTO_METHOD **crypto_array, UINT crypto_array_size,
                                         const NX_CRYPTO_CIPHERSUITE **cipher_map, UINT cipher_map_size,
                                         UCHAR * metadata_memory, UINT memory_size,
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
                                         UCHAR * https_metadata_memory, UINT https_memory_size,
-#endif /* NX_AZURE_IOT_FILE_UPLOAD */
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
                                         NX_SECURE_X509_CERT *trusted_certificate)
 {
 
@@ -167,10 +171,10 @@ az_result core_result;
     hub_client_ptr -> nx_azure_iot_hub_client_resource.resource_cipher_map_size = cipher_map_size;
     hub_client_ptr -> nx_azure_iot_hub_client_resource.resource_metadata_ptr = metadata_memory;
     hub_client_ptr -> nx_azure_iot_hub_client_resource.resource_metadata_size = memory_size;
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
     hub_client_ptr -> nx_azure_iot_hub_client_resource.resource_https_metadata_ptr = https_metadata_memory;
     hub_client_ptr -> nx_azure_iot_hub_client_resource.resource_https_metadata_size = https_memory_size;
-#endif
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
     hub_client_ptr -> nx_azure_iot_hub_client_resource.resource_trusted_certificate = trusted_certificate;
     hub_client_ptr -> nx_azure_iot_hub_client_resource.resource_hostname = host_name;
     hub_client_ptr -> nx_azure_iot_hub_client_resource.resource_hostname_length = host_name_length;
@@ -2718,7 +2722,7 @@ UINT status = NX_AZURE_IOT_SUCCESS;
     return(status);
 }
 
-#ifdef NX_AZURE_IOT_FILE_UPLOAD
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
 static az_result az_iot_hub_client_get_file_upload_request_uri(az_iot_hub_client const* client,
                                                                char *request_uri_buf,
                                                                size_t request_uri_size,
@@ -3231,7 +3235,6 @@ UINT notify_uri_len;
 UCHAR notify_body[256];
 UINT notify_body_len;
 
-
     if ((hub_client_ptr == NX_NULL)  || (hub_client_ptr -> nx_azure_iot_ptr == NX_NULL) ||
         (correlation_id == NX_NULL) || (correlation_id_len == 0) || 
         (description == NX_NULL) || (description_len == 0))
@@ -3377,4 +3380,4 @@ UINT notify_body_len;
     return(NX_AZURE_IOT_SUCCESS);
 }
 
-#endif /* NX_AZURE_IOT_FILE_UPLOAD */
+#endif /* NX_AZURE_IOT_FILE_UPLOAD_ENABLE */
