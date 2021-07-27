@@ -4,7 +4,7 @@ This project add file upload feature to [Azure IoT Middleware for Azure RTOS](ht
 
 Refer to [IoT hub document](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-file-upload) to understand IoT Hub file upload feature.
 
-only block call with TX_WAIT_FOREVER option is supported
+> This is not an official Azure RTOS patch/feature and not intended for production use. 
 
 ## Prerequisites
 
