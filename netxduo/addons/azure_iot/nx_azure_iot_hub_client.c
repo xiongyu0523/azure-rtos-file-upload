@@ -2921,6 +2921,8 @@ UCHAR request_uri[128];
 UINT request_uri_len;
 UCHAR request_body[128];
 UINT request_body_len;
+UCHAR iothub_sas_token[160];
+UINT iothub_sas_token_len;
 UINT get_status;
 UCHAR *buffer_ptr;
 UINT buffer_size;
@@ -2949,6 +2951,33 @@ NX_AZURE_IOT_JSON_READER json_reader;
 
     /* currently only block is supported */
     wait_option = NX_WAIT_FOREVER;
+
+    /* caculate sas token before connection */
+    if (hub_client_ptr -> nx_azure_iot_hub_client_token_refresh)
+    {
+        ULONG expiry_time_secs;
+
+        status = nx_azure_iot_unix_time_get(hub_client_ptr -> nx_azure_iot_ptr, &expiry_time_secs);
+        if (status != NX_SUCCESS)
+        {
+            LogError(LogLiteralArgs("IoTHub file upload client fail: unixtime get failed status: %d"), status);
+            return(status);
+        }
+
+        expiry_time_secs += NX_AZURE_IOT_HUB_CLIENT_TOKEN_EXPIRY;
+        status = hub_client_ptr -> nx_azure_iot_hub_client_token_refresh(hub_client_ptr,
+                                                                         expiry_time_secs,
+                                                                         hub_client_ptr -> nx_azure_iot_hub_client_symmetric_key,
+                                                                         hub_client_ptr -> nx_azure_iot_hub_client_symmetric_key_length,
+                                                                         iothub_sas_token,
+                                                                         sizeof(iothub_sas_token),
+                                                                         &iothub_sas_token_len);
+        if (status)
+        {
+            LogError(LogLiteralArgs("IoTHub file upload client fail: Token generation failed status: %d"), status);
+            return(status);
+        }
+    }
 
     status = nxd_dns_host_by_name_get(hub_client_ptr -> nx_azure_iot_ptr -> nx_azure_iot_dns_ptr,
                                       (UCHAR *)resource_ptr -> resource_hostname,
@@ -3025,6 +3054,22 @@ NX_AZURE_IOT_JSON_READER json_reader;
         LogError(LogLiteralArgs("IoTHub file upload client fail: request header add error status: %d"), status);
         nx_web_http_client_delete(https_client_ptr);
         return(status);
+    }
+
+    /* Authorization header is required only for sas token based authentication */
+    if (hub_client_ptr -> nx_azure_iot_hub_client_token_refresh)
+    {
+        status = nx_web_http_client_request_header_add(https_client_ptr, 
+                                                       "Authorization", sizeof("Authorization") - 1, 
+                                                       (CHAR *)iothub_sas_token, 
+                                                       iothub_sas_token_len,
+                                                       wait_option);
+        if (status != NX_SUCCESS)
+        {
+            LogError(LogLiteralArgs("IoTHub file upload client fail: request header add error status: %d"), status);
+            nx_web_http_client_delete(https_client_ptr);
+            return(status);
+        }
     }
 
     status = nx_web_http_client_request_send(https_client_ptr, wait_option);
@@ -3115,7 +3160,7 @@ NX_AZURE_IOT_JSON_READER json_reader;
             LogError(LogLiteralArgs("IoTHub file upload client fail: get response body error status: %d"), get_status);
             nx_azure_iot_buffer_free(buffer_context);
             nx_web_http_client_delete(https_client_ptr);
-            return(status);
+            return(get_status);
         }
 
         nx_packet_release(packet_ptr);
@@ -3234,6 +3279,8 @@ UCHAR notify_uri[128];
 UINT notify_uri_len;
 UCHAR notify_body[256];
 UINT notify_body_len;
+UCHAR iothub_sas_token[160];
+UINT iothub_sas_token_len;
 
     if ((hub_client_ptr == NX_NULL)  || (hub_client_ptr -> nx_azure_iot_ptr == NX_NULL) ||
         (correlation_id == NX_NULL) || (correlation_id_len == 0) || 
@@ -3247,7 +3294,34 @@ UINT notify_body_len;
     https_client_ptr = &(resource_ptr -> resource_https);
 
     /* currently only block is supported */
-    wait_option = NX_WAIT_FOREVER;    
+    wait_option = NX_WAIT_FOREVER;
+
+    /* caculate sas token before connection */
+    if (hub_client_ptr -> nx_azure_iot_hub_client_token_refresh)
+    {
+        ULONG expiry_time_secs;
+
+        status = nx_azure_iot_unix_time_get(hub_client_ptr -> nx_azure_iot_ptr, &expiry_time_secs);
+        if (status != NX_SUCCESS)
+        {
+            LogError(LogLiteralArgs("IoTHub file upload client fail: unixtime get failed status: %d"), status);
+            return(status);
+        }
+
+        expiry_time_secs += NX_AZURE_IOT_HUB_CLIENT_TOKEN_EXPIRY;
+        status = hub_client_ptr -> nx_azure_iot_hub_client_token_refresh(hub_client_ptr,
+                                                                         expiry_time_secs,
+                                                                         hub_client_ptr -> nx_azure_iot_hub_client_symmetric_key,
+                                                                         hub_client_ptr -> nx_azure_iot_hub_client_symmetric_key_length,
+                                                                         iothub_sas_token,
+                                                                         sizeof(iothub_sas_token),
+                                                                         &iothub_sas_token_len);
+        if (status)
+        {
+            LogError(LogLiteralArgs("IoTHub file upload client fail: Token generation failed status: %d"), status);
+            return(status);
+        }
+    }
 
     status = nxd_dns_host_by_name_get(hub_client_ptr -> nx_azure_iot_ptr -> nx_azure_iot_dns_ptr,
                                       (UCHAR *)resource_ptr -> resource_hostname,
@@ -3325,6 +3399,22 @@ UINT notify_body_len;
         LogError(LogLiteralArgs("IoTHub file upload client fail: request header add error status: %d"), status);
         nx_web_http_client_delete(https_client_ptr);
         return(status);
+    }
+
+    /* Authorization header is required only for sas token based authentication */
+    if (hub_client_ptr -> nx_azure_iot_hub_client_token_refresh)
+    {
+        status = nx_web_http_client_request_header_add(https_client_ptr, 
+                                                       "Authorization", sizeof("Authorization") - 1, 
+                                                       (CHAR *)iothub_sas_token, 
+                                                       iothub_sas_token_len,
+                                                       wait_option);
+        if (status != NX_SUCCESS)
+        {
+            LogError(LogLiteralArgs("IoTHub file upload client fail: request header add error status: %d"), status);
+            nx_web_http_client_delete(https_client_ptr);
+            return(status);
+        }
     }
 
     /* Send the HTTP request we just built. */

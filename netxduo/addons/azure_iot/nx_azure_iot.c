@@ -994,8 +994,14 @@ static UINT nx_azure_iot_hmac_sha256_calculate(NX_AZURE_IOT_RESOURCE *resource_p
 UINT i;
 UINT status;
 VOID *handler;
+#ifdef NX_AZURE_IOT_FILE_UPLOAD_ENABLE
+    /* HMAC-SHA256 reuse TLS metadata buffer, use HTTPS metadata buffer when file upload is enabled */
+UCHAR *metadata_ptr = resource_ptr -> resource_https_metadata_ptr;
+UINT metadata_size = resource_ptr -> resource_https_metadata_size;
+#else
 UCHAR *metadata_ptr = resource_ptr -> resource_metadata_ptr;
 UINT metadata_size = resource_ptr -> resource_metadata_size;
+#endif
 const NX_CRYPTO_METHOD *hmac_sha_256_crypto_method = NX_NULL;
 
 

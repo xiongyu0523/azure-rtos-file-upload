@@ -304,6 +304,8 @@ UINT loop = NX_TRUE;
         return;
     }
 
+#if (!defined(DISABLE_TELEMETRY_SAMPLE) || !defined(DISABLE_C2D_SAMPLE) || !defined(DISABLE_DIRECT_METHOD_SAMPLE) || !defined(DISABLE_DEVICE_TWIN_SAMPLE))
+
     if (nx_azure_iot_hub_client_connect(&iothub_client, NX_TRUE, NX_WAIT_FOREVER))
     {
         printf("Failed on nx_azure_iot_hub_client_connect!\r\n");
@@ -311,6 +313,7 @@ UINT loop = NX_TRUE;
         nx_azure_iot_delete(&nx_azure_iot);
         return;
     }
+#endif
     
 #ifndef DISABLE_TELEMETRY_SAMPLE
 

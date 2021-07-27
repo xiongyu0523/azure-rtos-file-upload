@@ -4,6 +4,8 @@ This project add file upload feature to [Azure IoT Middleware for Azure RTOS](ht
 
 Refer to [IoT hub document](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-file-upload) to understand IoT Hub file upload feature.
 
+only block call with TX_WAIT_FOREVER option is supported
+
 ## Prerequisites
 
 1. [STM32L4+ Discovery Kit IoT node](https://www.st.com/en/evaluation-tools/b-l4s5i-iot01a.html)
@@ -84,28 +86,33 @@ UINT nx_azure_iot_hub_file_upload_notify_complete(NX_AZURE_IOT_HUB_CLIENT *hub_c
    git clone https://github.com/xiongyu0523/azure-rtos-file-upload
    ```
 
-2. Follow this [page](https://github.com/Azure/azure-iot-sdk-c/blob/master/tools/CACertificates/CACertificateOverview.md) to use script in *tool/CACertificates* folder to generate your own root CA, device certificate and private keys. The key configured in this project is 2048 bits RSA.
+2. The demo support both certificate and symmetric-key based authentication to IoT Hub. DPS is supported and optional. Configure your IoT Hub and DPS service according to your use case. 
 
-3. Configure your IoT Hub and DPS service.
-   
-   - Follow this [page](https://docs.microsoft.com/en-us/azure/iot-dps/quick-setup-auto-provision) to create IoT Hub, IoT Hub DPS and link them together.
-   - Follow this [page](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-configure-file-upload) to configure IoT Hub file upload to blob storage.
-   - Follow this [page](https://docs.microsoft.com/en-us/azure/iot-dps/how-to-verify-certificates) to register the CA on your IoT Hub DPS.
-   - Follow this [page](https://docs.microsoft.com/en-us/azure/iot-dps/how-to-manage-enrollments#create-a-device-enrollment) to create your own individual enrollment.
-   - Follow t
+3. Refer to this [page](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-configure-file-upload) to configure IoT Hub file upload to blob storage.
 
 4. Open IAR EWARM workspace by double click **azure_rtos.eww**, Select **Options** > **C/C++ Compiler** >
 **Preprocessor Configure** to configure your WIFI_SSID and WIFI_PASSWORD.
 
-3. Expand the sample folder to open *sample_config.h* to set the **ID_SCOPE** and **REGISTRATION_ID** (device id) according to your IoT Hub DPS setting.
+5. Expand the sample folder to open *sample_config.h* to set the credential according to your IoT Hub and DPS setting. 
 
-4. Modify *sample_device_identity.c* to add your own device certificate and private key. (Use OPENSSL to convert PEM to DER format first and use xcc tool in ubuntu to convert to array format)
+    |  Macro | Sample value  | Note |
+    |  ----  | ----  | ---- | 
+    | HOST_NAME  | myiothub.azure-devices.net | When ENABLE_DPS_SAMPLE is NOT defined |
+    | DEVICE_ID  | mydevice | When ENABLE_DPS_SAMPLE is NOT defined |
+    | DEVICE_SYMMETRIC_KEY  | OtSNa...sKQBQOKtQ= | When USE_DEVICE_CERTIFICATE is 0 or not defined |
+    | ENDPOINT  | global.azure-devices-provisioning.net | When ENABLE_DPS_SAMPLE is defined  |
+    | ID_SCOPE  | 0ne00123456 | When ENABLE_DPS_SAMPLE is defined | 
+    | REGISTRATION_ID  | mydevice | | 
 
-5. Connect STM32L4+ discovery STLink USB port to PC. 
+6. **(Only if USE_DEVICE_CERTIFICATE is enabled)** 
+   - Follow this [page](https://github.com/Azure/azure-iot-sdk-c/blob/master/tools/CACertificates/CACertificateOverview.md) to use script in *tool/CACertificates* folder to generate your own root CA, device certificate and private keys. The key configured in this project is 2048 bits RSA.
+   - Modify *sample_device_identity.c* to add your own device certificate and private key. (Use OPENSSL to convert PEM to DER format first and use xcc tool in ubuntu to convert to array format)
 
-6. Select **Project** > **Batch build...** to rebuild the all 4 projects within workspace and press **CTRL+D** to start adebug session. Program will stop at **main()** function, press **F5** to go. 
+6. Connect STM32L4+ discovery STLink USB port to PC. 
 
-7. Open **view** -> **Terminal I/O** to check log output. Code will start to upload a test.txt file every 5 seconds.
+7. Select **Project** > **Batch build...** to rebuild the all 4 projects within workspace and press **CTRL+D** to start adebug session. Program will stop at **main()** function, press **F5** to go. 
+
+8. Open **view** -> **Terminal I/O** to check log output. Code will start to upload a test.txt file every 5 seconds.
 
 ```
 
@@ -126,5 +133,5 @@ Telemetry message send: {"Message ID":53}.
 
 ## Known issue and limitation
 
-1. CA signed certificate is not supported by IoT Hub file upload, so DPS is enabled to auto-register device identity using thumbprint. 
+1. To use CA signed certificate, you need a IoT Hub enabled public preview feature.  
 2. ASC agent is turned off, otherwise there are MQTT error messages generated, or get a hard fault. 
